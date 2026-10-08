@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { database } = require('./helpers.cjs');
-const { initializeDatabase } = require('../src/db/database.ts');
-const { registerUser } = require('../src/auth/authRepository.ts');
-const { createProject, updateProject, deleteProject, getProjectForUser, listProjects, createChapter, saveChapter, deleteChapter, getChapter, listChapters } = require('../src/db/repositories.ts');
-const { hasUnsavedChanges } = require('../src/data/chapterDraft.ts');
-const { TITLE_MAX_LENGTH, GENRE_MAX_LENGTH } = require('../src/data/contentValidation.ts');
+const { initializeDatabase } = require('../src/infrastructure/database/database.ts');
+const { registerUser } = require('../src/data/repositories/authRepository.ts');
+const { createProject, updateProject, deleteProject, getProjectForUser, listProjects, createChapter, saveChapter, deleteChapter, getChapter, listChapters } = require('../src/data/repositories/contentRepository.ts');
+const { hasUnsavedChanges } = require('../src/domain/validation/chapterDraft.ts');
+const { TITLE_MAX_LENGTH, GENRE_MAX_LENGTH } = require('../src/domain/validation/contentValidation.ts');
 
 async function setup(db) {
   await initializeDatabase(db);

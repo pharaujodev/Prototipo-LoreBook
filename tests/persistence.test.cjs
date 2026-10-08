@@ -4,8 +4,8 @@ const { database } = require('./helpers.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { initializeDatabase: migrate } = require('../src/db/database.ts');
-const { registerUser, authenticateUser } = require('../src/auth/authRepository.ts');
+const { initializeDatabase: migrate } = require('../src/infrastructure/database/database.ts');
+const { registerUser, authenticateUser } = require('../src/data/repositories/authRepository.ts');
 const actors = new WeakMap();
 const credentials = { name: 'Teste', email: 'teste@example.test', password: 'Senha123', confirmPassword: 'Senha123' };
 async function initializeDatabase(db) {
@@ -13,12 +13,12 @@ async function initializeDatabase(db) {
   const count = await db.getFirstAsync('SELECT COUNT(*) AS count FROM users');
   actors.set(db, count.count ? await authenticateUser(db, credentials) : await registerUser(db, credentials));
 }
-const repositories = require('../src/db/repositories.ts');
+const repositories = require('../src/data/repositories/contentRepository.ts');
 const listProjects = (db) => repositories.listProjects(db, actors.get(db));
 const listChapters = (db, id) => repositories.listChapters(db, id, actors.get(db));
 const createChapter = (db, id, title) => repositories.createChapter(db, id, title, actors.get(db));
 const saveChapter = (db, id, chapter, draft) => repositories.saveChapter(db, id, chapter, draft, actors.get(db));
-const { hasUnsavedChanges } = require('../src/data/chapterDraft.ts');
+const { hasUnsavedChanges } = require('../src/domain/validation/chapterDraft.ts');
 
 test('inicialização idempotente, contagens reais e isolamento entre obras', async () => {
   const db = database();

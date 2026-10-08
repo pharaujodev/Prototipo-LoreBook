@@ -4,12 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { database } = require('./helpers.cjs');
-const { initializeDatabase } = require('../src/db/database.ts');
-const { registerUser, authenticateUser, saveSession, restoreSession, clearSession } = require('../src/auth/authRepository.ts');
-const { validateRegistration, validateLogin, isUserRole } = require('../src/auth/validation.ts');
-const permissions = require('../src/auth/permissions.ts');
-const { listUsers } = require('../src/admin/adminRepository.ts');
-const { getDatabaseDiagnostics } = require('../src/db/diagnosticsRepository.ts');
+const { initializeDatabase } = require('../src/infrastructure/database/database.ts');
+const { registerUser, authenticateUser, saveSession, restoreSession, clearSession } = require('../src/data/repositories/authRepository.ts');
+const { validateRegistration, validateLogin, isUserRole } = require('../src/domain/validation/authValidation.ts');
+const permissions = require('../src/domain/permissions/permissions.ts');
+const { listUsers } = require('../src/data/repositories/adminRepository.ts');
+const { getDatabaseDiagnostics } = require('../src/data/repositories/diagnosticsRepository.ts');
 const valid = { name: 'Pessoa de teste', email: 'autor@example.test', password: 'Senha123', confirmPassword: 'Senha123' };
 async function withDatabase(action) {
   const db = database();
@@ -90,7 +90,7 @@ test('permissões são puras; ambos escrevem e apenas ADMIN ativo administra', (
   assert.equal(permissions.canAccessProject(user, user.id), true);
   assert.equal(permissions.canAccessProject(user, admin.id), false);
   assert.equal(permissions.canEditProject(admin, user.id), false);
-  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../src/auth/permissions.ts'), 'utf8'), /from ['"](?:react|expo-sqlite)/);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../src/domain/permissions/permissions.ts'), 'utf8'), /from ['"](?:react|expo-sqlite)/);
 });
 
 test('consultas administrativas usam contagens reais e negam USER antes do SQL', () => withDatabase(async (db) => {

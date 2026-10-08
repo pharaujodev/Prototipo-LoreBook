@@ -1,4 +1,4 @@
-import { ProjectWorkspace } from '../types';
+import { ProjectWorkspace } from '../domain/types/content';
 
 export const workspaces: ProjectWorkspace[] = [
   {

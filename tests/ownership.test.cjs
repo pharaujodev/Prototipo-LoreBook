@@ -4,12 +4,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { database } = require('./helpers.cjs');
-const { initializeDatabase } = require('../src/db/database.ts');
-const { registerUser, authenticateUser, saveSession, restoreSession, clearSession } = require('../src/auth/authRepository.ts');
-const { listProjects, getProjectForUser, createProject, listChapters, createChapter, saveChapter } = require('../src/db/repositories.ts');
-const { getUserDetail, getProjectAsAdmin, listChaptersAsAdmin, updateUserStatus } = require('../src/admin/adminRepository.ts');
-const { assertStatusChange } = require('../src/auth/permissions.ts');
-const { createChapterForUser, saveChapterForUser } = require('../src/auth/chapterActions.ts');
+const { initializeDatabase } = require('../src/infrastructure/database/database.ts');
+const { registerUser, authenticateUser, saveSession, restoreSession, clearSession } = require('../src/data/repositories/authRepository.ts');
+const { listProjects, getProjectForUser, createProject, listChapters, createChapter, saveChapter } = require('../src/data/repositories/contentRepository.ts');
+const { getUserDetail, getProjectAsAdmin, listChaptersAsAdmin, updateUserStatus } = require('../src/data/repositories/adminRepository.ts');
+const { assertStatusChange } = require('../src/domain/permissions/permissions.ts');
+const { createChapterForUser, saveChapterForUser } = require('../src/application/actions/chapterActions.ts');
 const valid = { name: 'Pessoa', email: 'admin@example.test', password: 'Senha123', confirmPassword: 'Senha123' };
 async function accounts(db) {
   await initializeDatabase(db);

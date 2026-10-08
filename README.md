@@ -166,25 +166,24 @@ Os testes automatizados não substituem a conferência da interface, do teclado,
 ## Arquitetura atual
 
 ```text
-Presentation → Application / State → Authorization → Data / Repository → SQLite
+Presentation → Application
+Application → Domain
+Application → Data / Repositories → Infrastructure / SQLite
 ```
 
 Telas apresentam e coletam dados; hooks/contexto coordenam estado; validações e permissões são regras puras; repositórios revalidam a conta e o proprietário antes de executar SQL. A arquitetura evolui por necessidade, sem introduzir navegação ou estado global externos.
 
-- `screens/` e `components/`: apresentação e interação.
-- `auth/AuthContext.tsx`: estado da autenticação, operações e restauração da sessão.
-- `auth/AuthFlow.tsx` e `auth/AuthGate.tsx`: fluxo de entrada e seleção entre autenticação e acervo.
-- `auth/permissions.ts` e `auth/validation.ts`: regras puras de autorização e validação.
-- `auth/chapterActions.ts`: verificação de permissão antes das operações de escrita.
-- `hooks/useProjects.ts` e `hooks/useChapters.ts`: operações de CRUD, rascunhos, estados de carregamento/erro e bloqueio de envios duplicados extraídos do App.
-- `data/contentValidation.ts`: validações compartilhadas de títulos/gênero e mensagens seguras de erro.
-- `components/FormControls.tsx`, `ConfirmationDialog.tsx`, `FeedbackProvider.tsx` e `StatusBadge.tsx`: controles, confirmações, sucesso transitório e status reutilizáveis.
-- `auth/useProjectAccess.ts`: abertura autorizada da obra, contexto pessoal/administrativo e feedback de acesso.
-- `auth/authRepository.ts`: cadastro, credenciais, sessão e revalidação da conta ativa.
-- `admin/adminRepository.ts`: lista/detalhe de usuários, consulta administrativa das obras e mudança de status.
-- `db/repositories.ts`: contratos de obras e capítulos com proprietário obrigatório nas operações; `db/diagnosticsRepository.ts`: contagens administrativas.
-- `db/transactions.ts`: serializa transações de escrita na conexão compartilhada do SQLite, inclusive na Web.
-- `db/database.ts` e `db/DatabaseGate.tsx`: migrações e inicialização do SQLite.
+- `presentation/screens/` e `presentation/components/`: telas, controles, feedback visual e composição dos fluxos `AuthFlow`, `AuthGate` e `DatabaseGate`.
+- `application/contexts/`: `AuthContext` gerencia autenticação/sessão; `FeedbackContext` centraliza estado, confirmação e mensagens transitórias.
+- `application/hooks/`: CRUD e rascunhos em `useProjects`/`useChapters`, autorização e acesso em `useAuthorization`/`useProjectAccess`, ciclo de inicialização do banco em `useDatabase`.
+- `application/actions/chapterActions.ts`: verificação de permissão antes das operações de escrita.
+- `domain/auth/`, `domain/permissions/`, `domain/validation/` e `domain/types/`: tipos, permissões, validações e regras puras, sem React ou SQLite.
+- `data/repositories/authRepository.ts`: cadastro, credenciais, sessão e revalidação da conta ativa.
+- `data/repositories/adminRepository.ts`: lista/detalhe de usuários, consulta administrativa das obras e mudança de status.
+- `data/repositories/contentRepository.ts`: operações de obras e capítulos com proprietário obrigatório; `diagnosticsRepository.ts`: contagens administrativas.
+- `infrastructure/database/database.ts` e `transactions.ts`: schema, migrações, inicialização e transações SQLite, inclusive na Web.
+- `infrastructure/security/passwords.ts`: implementação do salt/hash com Expo Crypto.
+- `data/mock.ts`: dados demonstrativos existentes; `theme.ts`: tema compartilhado.
 - `App.tsx`: composição dos fluxos e navegação existente, controlada por estado.
 
 ### Regras de negócio
