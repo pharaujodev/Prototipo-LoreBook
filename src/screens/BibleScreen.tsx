@@ -2,10 +2,12 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme';
 import { BibleEntry } from '../types';
+import { FeedbackState } from '../components/FeedbackState';
 
 export function BibleScreen({ entries }: { entries: BibleEntry[] }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      {entries.length === 0 ? <FeedbackState kind="empty" title="Um mundo por descobrir" message="Esta obra ainda não tem locais, regras ou detalhes de mundo. Por enquanto, você pode planejar tudo na aba Notas." /> : null}
       {entries.map((entry) => (
         <View key={entry.id} style={styles.card}>
           <Text style={styles.category}>{entry.category.toUpperCase()}</Text>

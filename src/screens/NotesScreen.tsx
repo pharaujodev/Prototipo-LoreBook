@@ -12,9 +12,9 @@ export function NotesScreen({ notes, onChangeNotes }: Props) {
     <View style={styles.root}>
       <View style={styles.banner}>
         <Text style={styles.bannerTitle}>Espaço de planejamento</Text>
-        <Text style={styles.bannerText}>Ideias daqui não fazem parte do manuscrito até você decidir incorporá-las.</Text>
+        <Text style={styles.bannerText}>Ideias fora do manuscrito. Neste protótipo, as notas ficam apenas nesta sessão.</Text>
       </View>
-      <TextInput multiline value={notes} onChangeText={onChangeNotes} textAlignVertical="top" style={styles.input} />
+      <TextInput accessibilityLabel="Notas da obra" placeholder="Uma ideia, uma pergunta, uma cena… Sua próxima descoberta pode começar aqui." placeholderTextColor={theme.colors.textMuted} multiline value={notes} onChangeText={onChangeNotes} textAlignVertical="top" style={styles.input} />
     </View>
   );
 }

@@ -19,11 +19,14 @@ export type Project = {
   updatedAt: string;
 };
 
+export const chapterStatuses = ['Rascunho', 'Revisão', 'Concluído'] as const;
+export type ChapterStatus = typeof chapterStatuses[number];
+
 export type Chapter = {
   id: string;
   number: number;
   title: string;
-  status: 'Rascunho' | 'Revisão' | 'Concluído';
+  status: ChapterStatus;
   words: number;
   content: string;
 };

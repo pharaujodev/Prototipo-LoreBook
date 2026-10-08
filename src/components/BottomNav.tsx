@@ -23,7 +23,7 @@ export function BottomNav({ active, onChange }: Props) {
       {items.map((item) => {
         const selected = item.key === active;
         return (
-          <Pressable key={item.key} style={styles.item} onPress={() => onChange(item.key)}>
+          <Pressable accessibilityRole="tab" accessibilityState={{ selected }} accessibilityLabel={item.label} key={item.key} style={[styles.item, selected && styles.activeItem]} onPress={() => onChange(item.key)}>
             <Text style={[styles.icon, selected && styles.selected]}>{item.icon}</Text>
             <Text style={[styles.label, selected && styles.selected]}>{item.label}</Text>
           </Pressable>
@@ -45,5 +45,6 @@ const styles = StyleSheet.create({
   item: { flex: 1, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   icon: { fontSize: 19, color: theme.colors.textMuted },
   label: { fontSize: 10, marginTop: 3, color: theme.colors.textMuted, fontWeight: '600' },
+  activeItem: { backgroundColor: theme.colors.primarySoft, borderRadius: 10, borderTopWidth: 2, borderTopColor: theme.colors.primary },
   selected: { color: theme.colors.primary }
 });

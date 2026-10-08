@@ -2,15 +2,20 @@
   "expo": {
     "name": "LoreBook",
     "slug": "atelie-mobile-prototype",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.atelie.prototype"
     },
     "ios": {
       "bundleIdentifier": "com.atelie.prototype"
-    }
+    },
+    "plugins": [
+      "expo-sqlite"
+    ]
   }
 }
