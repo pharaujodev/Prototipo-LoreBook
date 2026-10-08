@@ -36,7 +36,7 @@ export function DatabaseGate({ children }: { children: (db: SQLiteDatabase) => R
     <StatusBar style="dark" />
     <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       <FeedbackState kind={error ? 'error' : 'loading'}
-        title={error ? 'Não conseguimos abrir seu ateliê' : 'Abrindo seu ateliê'}
+        title={error ? 'Não conseguimos abrir sua biblioteca' : 'Preparando sua biblioteca'}
         message={error ? 'O armazenamento não respondeu. Tente abrir novamente para acessar suas obras.' : 'Preparando suas obras e deixando tudo pronto para a próxima página.'}
         actionLabel={error ? 'Tentar novamente' : undefined}
         onAction={error ? () => { setError(false); setAttempt((value) => value + 1); } : undefined} />

@@ -6,6 +6,7 @@ import type { AuthUser } from '../auth/authTypes';
 import { requireActiveUser } from '../auth/authRepository';
 import { canAccessProject, canEditProject, PermissionError, requireAdminPermission } from '../auth/permissions';
 import { inTransaction } from './transactions';
+import { ContentValidationError, normalizeProject, normalizeTitle, ProjectInput } from '../data/contentValidation';
 
 type ProjectRow = {
   id: string;
@@ -63,15 +64,34 @@ export async function getProjectForUser(db: SQLiteDatabase, projectId: string, a
   return toProject(row);
 }
 
-// Contrato pronto para o futuro formulário de criação; proprietário nunca vem do input.
-export async function createProject(db: SQLiteDatabase, actor: AuthUser | null, input: { title: string; genre?: string }): Promise<Project> {
-  if (!input.title.trim()) throw new Error('Informe um título.');
+// RN-11: proprietário sempre vem da conta autenticada, inclusive para ADMIN.
+export async function createProject(db: SQLiteDatabase, actor: AuthUser | null, input: ProjectInput): Promise<Project> {
+  const values = normalizeProject(input);
   return inTransaction(db, async () => {
     const user = await requireActiveUser(db, actor);
     const id = Crypto.randomUUID();
     await db.runAsync('INSERT INTO projects (id, owner_user_id, title, genre, updated_at) VALUES (?, ?, ?, ?, ?)',
-      id, user.id, input.title.trim(), input.genre?.trim() ?? '', new Date().toISOString());
+      id, user.id, values.title, values.genre, new Date().toISOString());
     return getProjectForUser(db, id, user);
+  });
+}
+
+// RN-12: o contexto administrativo nunca concede escrita em obra alheia.
+export async function updateProject(db: SQLiteDatabase, actor: AuthUser | null, projectId: string, input: ProjectInput): Promise<Project> {
+  const values = normalizeProject(input);
+  return inTransaction(db, async () => {
+    await getProjectForUser(db, projectId, actor);
+    await db.runAsync('UPDATE projects SET title = ?, genre = ?, updated_at = ? WHERE id = ?', values.title, values.genre, new Date().toISOString(), projectId);
+    return getProjectForUser(db, projectId, actor);
+  });
+}
+
+export async function deleteProject(db: SQLiteDatabase, actor: AuthUser | null, projectId: string): Promise<void> {
+  await inTransaction(db, async () => {
+    await getProjectForUser(db, projectId, actor);
+    // RN-14: filhos explícitos para suportar também bancos legados sem CASCADE.
+    await db.runAsync('DELETE FROM chapters WHERE project_id = ?', projectId);
+    await db.runAsync('DELETE FROM projects WHERE id = ?', projectId);
   });
 }
 
@@ -95,11 +115,18 @@ export async function listChapters(db: SQLiteDatabase, projectId: string, actor:
   }));
 }
 
+export async function getChapter(db: SQLiteDatabase, projectId: string, chapterId: string, actor: AuthUser | null): Promise<Chapter> {
+  await getProjectForUser(db, projectId, actor);
+  const chapter = await db.getFirstAsync<ChapterRow>('SELECT id, number, title, status, words, content FROM chapters WHERE id = ? AND project_id = ?', chapterId, projectId);
+  if (!chapter) throw new ContentValidationError('Este capítulo não está mais disponível.');
+  return { ...chapter };
+}
+
 export async function createChapter(db: SQLiteDatabase, projectId: string, title: string, actor: AuthUser | null): Promise<Chapter> {
-  if (!title.trim()) throw new Error('Informe um título.');
+  const normalizedTitle = normalizeTitle(title);
   let chapter!: Chapter;
   await inTransaction(db, async () => {
-    // RN-10: capítulos herdam o proprietário da obra, inclusive em chamadas diretas.
+    // RN-13/17: exige proprietário ativo e obra existente, inclusive em chamadas diretas.
     await getProjectForUser(db, projectId, actor);
     const nextRow = await db.getFirstAsync<{ next_number: number }>(
       `SELECT COALESCE(MAX(number), 0) + 1 AS next_number
@@ -113,7 +140,7 @@ export async function createChapter(db: SQLiteDatabase, projectId: string, title
     chapter = {
       id,
       number,
-      title: title.trim(),
+      title: normalizedTitle,
       status: 'Rascunho',
       words: 0,
       content: ''
@@ -139,14 +166,16 @@ export async function createChapter(db: SQLiteDatabase, projectId: string, title
 }
 
 export async function saveChapter(db: SQLiteDatabase, projectId: string, chapterId: string, draft: ChapterDraft, actor: AuthUser | null) {
-  if (!chapterStatuses.includes(draft.status)) throw new Error('Status inválido.');
+  if (!chapterStatuses.includes(draft.status)) throw new ContentValidationError('Status inválido.');
   const words = countWords(draft.content);
   await inTransaction(db, async () => {
-    await getProjectForUser(db, projectId, actor);
+    const current = await getChapter(db, projectId, chapterId, actor);
+    const title = normalizeTitle(draft.title ?? current.title);
     const result = await db.runAsync(
       `UPDATE chapters
-       SET content = ?, status = ?, words = ?, updated_at = ?
+       SET title = ?, content = ?, status = ?, words = ?, updated_at = ?
        WHERE id = ? AND project_id = ?`,
+      title,
       draft.content,
       draft.status,
       words,
@@ -162,4 +191,12 @@ export async function saveChapter(db: SQLiteDatabase, projectId: string, chapter
     await db.runAsync('UPDATE projects SET updated_at = ? WHERE id = ?', new Date().toISOString(), projectId);
   });
   return words;
+}
+
+export async function deleteChapter(db: SQLiteDatabase, projectId: string, chapterId: string, actor: AuthUser | null): Promise<void> {
+  await inTransaction(db, async () => {
+    await getChapter(db, projectId, chapterId, actor);
+    await db.runAsync('DELETE FROM chapters WHERE id = ? AND project_id = ?', chapterId, projectId);
+    await db.runAsync('UPDATE projects SET updated_at = ? WHERE id = ?', new Date().toISOString(), projectId);
+  });
 }

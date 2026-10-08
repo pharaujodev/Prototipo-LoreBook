@@ -8,13 +8,14 @@ type Props = {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  compact?: boolean;
 };
 
-export function FeedbackState({ kind, title, message, actionLabel, onAction }: Props) {
+export function FeedbackState({ kind, title, message, actionLabel, onAction, compact = false }: Props) {
   const label = { loading: 'UM INSTANTE', empty: 'UM NOVO COMEÇO', error: 'UMA PAUSA NO CAMINHO', success: 'TUDO GUARDADO' }[kind];
   return (
-    <View style={styles.root} accessibilityLiveRegion="polite" accessibilityState={{ busy: kind === 'loading' }}>
-      <View style={styles.illustration} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View style={[styles.root, compact && styles.compact]} accessibilityLiveRegion="polite" accessibilityState={{ busy: kind === 'loading' }}>
+      {!compact ? <View style={styles.illustration} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <View style={styles.orbit} />
         <View style={styles.backPage} />
         <View style={styles.page}>
@@ -26,22 +27,23 @@ export function FeedbackState({ kind, title, message, actionLabel, onAction }: P
           {kind === 'loading' ? <ActivityIndicator color={theme.colors.primary} accessibilityLabel="Carregando" /> :
             <Text style={[styles.sealText, kind === 'error' && styles.errorText, kind === 'success' && styles.successText]}>{kind === 'error' ? '!' : kind === 'success' ? '✓' : '+'}</Text>}
         </View>
-      </View>
+      </View> : kind === 'loading' ? <ActivityIndicator color={theme.colors.primary} /> : null}
       <Text style={styles.eyebrow}>{label}</Text>
-      <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+      <Text accessibilityRole="header" style={[styles.title, compact && styles.compactTitle]}>{title}</Text>
+      <Text accessibilityRole={kind === 'error' ? 'alert' : undefined} style={styles.message}>{message}</Text>
       {actionLabel && onAction ? (
         <Pressable accessibilityRole="button" accessibilityLabel={actionLabel} style={({ pressed }) => [styles.action, pressed && { opacity: 0.8 }]} onPress={onAction}>
           <Text style={styles.actionText}>{actionLabel}</Text>
         </Pressable>
       ) : null}
-      <View style={styles.divider} />
-      <Text style={styles.signature}>LOREBOOK · SEU ESPAÇO DE ESCRITA</Text>
+      {!compact ? <><View style={styles.divider} /><Text style={styles.signature}>LOREBOOK · BIBLIOTECA DE HISTÓRIAS</Text></> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  compact: { paddingVertical: theme.spacing.xl, paddingHorizontal: theme.spacing.lg },
+  compactTitle: { fontSize: 23, lineHeight: 29 },
   root: {
     alignItems: 'center',
     justifyContent: 'center',

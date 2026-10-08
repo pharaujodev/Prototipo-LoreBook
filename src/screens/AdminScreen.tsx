@@ -64,10 +64,10 @@ export function AdminScreen({ db, onBack, onOpenUser }: { db: SQLiteDatabase; on
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingBottom: 36 },
-  title: { color: theme.colors.text, fontSize: 20, fontWeight: '700' },
+  content: { padding: theme.layout.page, paddingBottom: theme.spacing.xxl, width: '100%', maxWidth: theme.layout.maxWidth, alignSelf: 'center' },
+  title: { color: theme.colors.text, fontSize: theme.typography.heading, fontFamily: theme.font.editorial },
   help: { color: theme.colors.textMuted, fontSize: 13, lineHeight: 20, marginTop: 8, marginBottom: 18 },
-  card: { padding: 16, marginBottom: 10, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+  card: { padding: theme.spacing.lg, marginBottom: theme.spacing.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderLeftWidth: 3, borderLeftColor: theme.colors.primary, borderRadius: theme.radius.md },
   name: { color: theme.colors.text, fontSize: 16, fontWeight: '700' },
   text: { color: theme.colors.textMuted, fontSize: 14, marginTop: 6 },
   role: { color: theme.colors.primary, fontSize: 13, fontWeight: '700', marginTop: 8 },

@@ -32,5 +32,6 @@ export function useProjectAccess(db: SQLiteDatabase) {
     if (!allowed) setAccessError('Esta obra não está disponível para edição neste contexto.');
     return allowed;
   };
-  return { project, administrative, opening, accessError, open, requireProjectWrite };
+  const clear = () => { request.current++; setProject(null); setAdministrative(false); setAccessError(''); setOpening(false); };
+  return { project, administrative, opening, accessError, open, requireProjectWrite, clear };
 }

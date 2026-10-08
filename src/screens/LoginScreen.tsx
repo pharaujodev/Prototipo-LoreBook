@@ -15,7 +15,7 @@ export function LoginScreen({ initialEmail, error, success, submitting, onLogin,
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const submit = () => { if (!submitting) onLogin({ email, password }); };
-  return <AuthForm title="Entre no seu ateliê" description="Acesse sua conta local para escrever ou acompanhar as histórias." error={error} success={success}>
+  return <AuthForm title="Sua biblioteca espera." description="Entre para continuar suas histórias. Seu universo começa aqui." error={error} success={success}>
     <AuthField label="E-mail" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false}
       keyboardType="email-address" autoComplete="email" editable={!submitting} />
     <AuthField label="Senha" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none"

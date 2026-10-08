@@ -9,7 +9,7 @@ export function CharactersScreen({ characters, onOpenCharacter }: { characters: 
     <ScrollView contentContainerStyle={styles.content}>
       {characters.length === 0 ? <FeedbackState kind="empty" title="Quem habita sua história?" message="Ainda não há fichas nesta obra. A criação de personagens estará disponível em uma próxima etapa." /> : null}
       {characters.map((character) => (
-        <Pressable key={character.id} style={styles.card} onPress={() => onOpenCharacter(character.id)}>
+        <Pressable key={character.id} accessibilityRole="button" accessibilityLabel={'Abrir ficha de ' + character.name} style={styles.card} onPress={() => onOpenCharacter(character.id)}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{character.name.charAt(0)}</Text></View>
           <View style={styles.body}>
             <Text style={styles.name}>{character.name}</Text>

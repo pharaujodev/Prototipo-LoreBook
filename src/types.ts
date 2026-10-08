@@ -1,5 +1,7 @@
 export type ScreenName =
   | 'projects'
+  | 'newProject'
+  | 'editProject'
   | 'workHome'
   | 'chapters'
   | 'newChapter'

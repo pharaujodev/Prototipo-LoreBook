@@ -2,7 +2,7 @@
 
 O LoreBook é um protótipo de aplicativo mobile para escrever e organizar histórias. Ele reúne capítulos, personagens, informações sobre o universo da obra e notas de planejamento em um só lugar.
 
-Desenvolvido com React Native, TypeScript e Expo, o projeto explora uma experiência de escrita no celular com armazenamento local. Sua identidade visual se inspira no Ateliê Desktop, combinando vinho, dourado, tons de papel e tipografia serifada. Os dois aplicativos são projetos separados, sem integração de dados.
+Desenvolvido com React Native, TypeScript e Expo, o projeto explora uma experiência de escrita no celular com armazenamento local. A identidade própria do LoreBook segue o conceito **códice editorial contemporâneo**: papel claro, tinta escura, ameixa, latão discreto e títulos serifados. O corpo usa fonte de sistema para leitura confortável, sem pacotes de fontes ou UI kits.
 
 ## Objetivos
 
@@ -17,7 +17,7 @@ Desenvolvido com React Native, TypeScript e Expo, o projeto explora uma experiê
 ### Conta e perfis
 
 - Cadastro e login locais com nome, e-mail e senha.
-- Perfil **Usuário (USER)**: acessa suas próprias obras, cria capítulos, edita texto e status e salva alterações.
+- Perfil **Usuário (USER)**: cria, consulta, edita e exclui suas próprias obras e capítulos.
 - Perfil **Administrador (ADMIN)**: escreve nas próprias obras e consulta usuários, suas obras e o diagnóstico SQLite em uma área administrativa separada.
 - Sessão restaurada automaticamente ao reabrir o aplicativo.
 - Dados da conta e saída com confirmação em **Configurações**.
@@ -31,11 +31,14 @@ Contas desativadas não entram no aplicativo; suas obras permanecem salvas. A de
 ### Obras e manuscrito
 
 - Duas obras de exemplo, atribuídas ao primeiro Administrador, com conteúdos independentes.
+- CRUD de obras: criar, listar, editar título/gênero e excluir com confirmação.
 - Visão geral com quantidade de capítulos, contagem de palavras e porcentagem de capítulos concluídos.
-- Criação de capítulos com título e abertura no editor.
-- Edição de texto e seleção de status: **Rascunho**, **Em revisão** ou **Concluído**.
-- Salvamento manual do texto e do status no dispositivo.
+- CRUD de capítulos: criar, ler, editar título/texto/status e excluir com confirmação.
+- Status: **Rascunho**, **Em revisão** ou **Concluído**.
+- Salvamento manual de título, texto e status no dispositivo, com contagem real de palavras.
 - Aviso ao sair do editor com alterações pendentes, com opções para salvar, continuar escrevendo ou descartar.
+- Títulos obrigatórios de 1–80 caracteres após trim; gênero opcional de até 40 caracteres. Validação também nos repositórios.
+- Exclusão de obra e capítulos associados na mesma transação, com rollback em caso de erro.
 
 ### Planejamento da história
 
@@ -47,6 +50,9 @@ Contas desativadas não entram no aplicativo; suas obras permanecem salvas. A de
 
 - Navegação entre obra, capítulos, personagens, bíblia e notas.
 - Estados de carregamento, conteúdo vazio, erro e salvamento.
+- Mensagens discretas de sucesso, dispensáveis e com fechamento automático.
+- Confirmações consistentes para excluir, sair da conta, descartar alterações e desativar usuário.
+- Labels visíveis, nomes acessíveis, botões com altura mínima de 48 px e navegação respeitando safe area.
 - Ações para tentar novamente quando uma operação falha.
 - Prévia visual dos estados em **Obra → Configurações → Prévia dos estados**, sem alterar os dados da obra.
 
@@ -65,7 +71,7 @@ Contas desativadas não entram no aplicativo; suas obras permanecem salvas. A de
 
 ### Pré-requisitos
 
-- Node.js 24 e npm.
+- Node.js 22 ou superior e npm.
 - Terminal aberto na pasta do projeto.
 - Para Android: emulador configurado ou dispositivo com ambiente Expo compatível com o projeto.
 - Para o simulador iOS: macOS e Xcode.
@@ -92,12 +98,12 @@ No Windows, use Android ou web. As versões das dependências estão definidas e
 
 1. Toque em **Criar conta** e preencha nome, e-mail, senha e confirmação. A senha deve ter pelo menos seis caracteres.
 2. Após cadastrar, entre com seu e-mail e senha.
-3. Escolha uma obra da sua conta e abra **Capítulos**. O primeiro Administrador recebe as obras de exemplo; contas posteriores começam sem obras.
-4. Abra ou crie um capítulo, escreva, selecione o status e toque em **Salvar capítulo**. Essa função está disponível aos dois perfis.
+3. Em **Minhas obras**, toque em **Nova obra**, preencha título e gênero e crie. O primeiro Administrador também recebe as obras de exemplo.
+4. Na home da obra, crie um capítulo, edite título e texto, selecione o status e toque em **Salvar capítulo**. Essa função está disponível aos dois perfis.
 5. Em **Configurações**, consulte sua conta ou saia para entrar com outra conta.
 6. Como Administrador, use **Configurações → Painel administrativo → Ver detalhes** para consultar o usuário e suas obras ou ativar/desativar uma conta USER. O diagnóstico fica no painel.
 
-A tela de criação de obras ainda não está disponível. O repositório já permite criar uma obra vinculada automaticamente à conta autenticada; o formulário será consolidado em um próximo hotfix funcional. Por isso, uma conta USER recém-criada permanece com a lista vazia na interface atual.
+Para editar a obra, use **Editar título e gênero** na home. A opção **Excluir obra** fica no fim dessa tela. Para excluir um capítulo, abra o editor e use **Excluir capítulo**, abaixo do manuscrito. Confirme somente após revisar a mensagem: exclusões são definitivas no dispositivo. Excluir uma obra também remove seus capítulos.
 
 Ao reabrir o aplicativo no mesmo dispositivo, a sessão é recuperada antes de mostrar o acervo. Para trocar de conta, use **Sair da conta → Confirmar saída**.
 
@@ -110,12 +116,13 @@ Use **Personagens** e **Bíblia da obra** como referência durante o planejament
 | Recurso | Comportamento |
 | --- | --- |
 | Obras de exemplo | Duas obras adicionadas na primeira inicialização do banco |
-| Capítulos | Criação, texto e status persistidos no SQLite local (`lorebook.db`) |
-| Salvamento | Manual; selecionar status também exige salvar |
+| Obras | Criação, título, gênero, proprietário e exclusão no SQLite local (`lorebook.db`) |
+| Capítulos | Título, conteúdo, status, palavras e exclusão persistidos |
+| Salvamento | Manual no editor; título e status também exigem salvar |
 | Contas e sessão | Persistidas localmente no SQLite; no máximo uma sessão ativa |
 | Notas | Editáveis por ambos os perfis, mantidas apenas durante a sessão |
 | Personagens e bíblia | Conteúdo demonstrativo, somente consulta |
-| Nova obra e novas fichas | Ainda indisponíveis |
+| Novas fichas e registros da Bíblia | Ainda indisponíveis; obras novas mostram estados vazios |
 | Backup, recuperação de senha e sincronização | Ainda indisponíveis |
 
 Os capítulos salvos permanecem disponíveis ao reabrir o aplicativo no mesmo dispositivo. As notas são temporárias e não são recuperadas após encerrar a sessão ou sair da conta. Não há backend nem compartilhamento automático de dados entre dispositivos. A migração do banco adiciona as tabelas de autenticação sem apagar obras ou capítulos existentes.
@@ -129,6 +136,8 @@ O schema atual é **5**. A atualização é transacional, sem apagar tabelas, ob
 - Triggers impedem novas obras sem proprietário ou a remoção do vínculo existente. A FK impede referência a usuário inexistente. O repositório obtém o proprietário da conta autenticada, sem aceitar um proprietário informado no formulário.
 - Para o schema intermediário 3 (AUTHOR/READER), a conta mais antiga passa a ADMIN e as demais a USER. IDs, hashes, salts e sessão são preservados. Como o CHECK antigo não aceita os novos perfis, as tabelas antigas são renomeadas para `users_legacy_v3` e `app_session_legacy_v3` e mantidas como arquivo de compatibilidade; as tabelas ativas recebem os registros convertidos. Nenhuma tabela é descartada. Esse arquivo mantém credenciais antigas e não é usado pelo aplicativo.
 - Schemas 4 → 5 usam apenas ALTER TABLE, preenchimento de propriedade, índice e triggers. Inicializações repetidas não duplicam ou sobrescrevem conteúdo.
+
+O CRUD atual usa esse schema sem nova migração. Excluir obra remove explicitamente seus capítulos na mesma transação, inclusive em bancos antigos sem cascade. Os números dos capítulos restantes não são alterados após uma exclusão. Os IDs, vínculos e timestamps existentes são preservados; alterações atualizam `updated_at`.
 
 As senhas não são guardadas em texto puro: cada conta usa salt aleatório individual de 16 bytes e hash SHA-256 via `expo-crypto`. **Esta solução é adequada ao protótipo acadêmico local, mas em produção seria recomendado backend com KDF apropriado, como Argon2, scrypt ou bcrypt.** O banco não é criptografado, e a autorização do aplicativo não protege contra adulteração direta do arquivo SQLite.
 
@@ -154,13 +163,22 @@ O `metro.config.js` configura WebAssembly e os cabeçalhos necessários ao SQLit
 
 Os testes automatizados não substituem a conferência da interface, do teclado, da navegação e da persistência em dispositivos Android/iOS.
 
-### Organização do código
+## Arquitetura atual
+
+```text
+Presentation → Application / State → Authorization → Data / Repository → SQLite
+```
+
+Telas apresentam e coletam dados; hooks/contexto coordenam estado; validações e permissões são regras puras; repositórios revalidam a conta e o proprietário antes de executar SQL. A arquitetura evolui por necessidade, sem introduzir navegação ou estado global externos.
 
 - `screens/` e `components/`: apresentação e interação.
 - `auth/AuthContext.tsx`: estado da autenticação, operações e restauração da sessão.
 - `auth/AuthFlow.tsx` e `auth/AuthGate.tsx`: fluxo de entrada e seleção entre autenticação e acervo.
 - `auth/permissions.ts` e `auth/validation.ts`: regras puras de autorização e validação.
 - `auth/chapterActions.ts`: verificação de permissão antes das operações de escrita.
+- `hooks/useProjects.ts` e `hooks/useChapters.ts`: operações de CRUD, rascunhos, estados de carregamento/erro e bloqueio de envios duplicados extraídos do App.
+- `data/contentValidation.ts`: validações compartilhadas de títulos/gênero e mensagens seguras de erro.
+- `components/FormControls.tsx`, `ConfirmationDialog.tsx`, `FeedbackProvider.tsx` e `StatusBadge.tsx`: controles, confirmações, sucesso transitório e status reutilizáveis.
 - `auth/useProjectAccess.ts`: abertura autorizada da obra, contexto pessoal/administrativo e feedback de acesso.
 - `auth/authRepository.ts`: cadastro, credenciais, sessão e revalidação da conta ativa.
 - `admin/adminRepository.ts`: lista/detalhe de usuários, consulta administrativa das obras e mudança de status.
@@ -183,11 +201,18 @@ Os testes automatizados não substituem a conferência da interface, do teclado,
 | RN-08 | ADMIN não desativa a própria conta |
 | RN-09 | Pelo menos um ADMIN ativo deve ser preservado; alteração de status limitada a USER |
 | RN-10 | Capítulos herdam a autorização da obra |
+| RN-11 | Toda nova obra pertence à conta autenticada |
+| RN-12 | Somente proprietário modifica ou exclui a obra |
+| RN-13 | Somente proprietário ativo cria, edita ou exclui seus capítulos |
+| RN-14 | Excluir obra remove os capítulos associados de forma atômica |
+| RN-15 | Título de obra não pode ser vazio |
+| RN-16 | Título de capítulo não pode ser vazio |
+| RN-17 | Obra inexistente não recebe novos capítulos |
 
 A lista pessoal filtra por proprietário. Os repositórios validam conta ativa, propriedade e contexto antes de ler ou alterar conteúdo. A consulta administrativa exige ADMIN e não libera escrita em obras alheias. Os handlers e a interface também verificam as permissões. As transações mantêm cadastro/atribuição de legado e status/invalidação de sessão consistentes.
 
 ### Evolução prevista
 
-A N2 pode reutilizar IDs de usuário, vínculo de propriedade, perfis, status, regras puras e contratos dos repositórios. A tradução de `owner_user_id` (SQLite) para `ownerUserId` (TypeScript) fica na camada de dados. Não há backend, API ou sincronização implementados. Um backend futuro precisará validar identidade e autorização no servidor; o hash acadêmico e o contexto local não devem ser tratados como credenciais remotas.
+Futuramente pode-se reutilizar IDs de usuário, vínculo de propriedade, perfis, status, regras puras e contratos dos repositórios. A tradução de `owner_user_id` (SQLite) para `ownerUserId` (TypeScript) fica na camada de dados. Não há backend, API ou sincronização implementados. Um backend futuro precisará validar identidade e autorização no servidor; o hash acadêmico e o contexto local não devem ser tratados como credenciais remotas.
 
-O HF3 fica reservado à consistência visual, feedback, acessibilidade e usabilidade. Navegação ainda é coordenada por estado no App, notas são temporárias e personagens/bíblia continuam demonstrativos. A criação de obras pela interface fica para uma evolução funcional própria.
+Navegação ainda é coordenada por estado no App, notas são temporárias e personagens/Bíblia continuam demonstrativos. Backend, sincronização, autenticação online, colaboração, publicação e recuperação de senha não estão implementados. Futuramente será exigido decisões próprias de segurança, conflitos e propagação de exclusões.

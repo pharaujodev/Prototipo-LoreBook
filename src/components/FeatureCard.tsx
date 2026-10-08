@@ -11,7 +11,7 @@ type Props = {
 
 export function FeatureCard({ icon, title, description, onPress }: Props) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title + '. ' + description} style={({ pressed }) => [styles.card, pressed && { backgroundColor: theme.colors.primarySoft }]} onPress={onPress}>
       <View style={styles.iconBox}><Text style={styles.icon}>{icon}</Text></View>
       <View style={styles.content}>
         <Text style={styles.title}>{title}</Text>
@@ -23,11 +23,11 @@ export function FeatureCard({ icon, title, description, onPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: 14, marginBottom: 12 },
-  iconBox: { width: 46, height: 46, borderRadius: 14, backgroundColor: theme.colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  card: { flexDirection: 'row', alignItems: 'center', minHeight: 80, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.sm, padding: theme.spacing.lg, marginBottom: theme.spacing.sm },
+  iconBox: { width: 44, height: 44, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
   icon: { fontSize: 22, color: theme.colors.primary },
   content: { flex: 1, marginLeft: 12 },
-  title: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  description: { fontSize: 12, marginTop: 3, color: theme.colors.textMuted, lineHeight: 17 },
+  title: { fontSize: 20, fontFamily: theme.font.editorial, color: theme.colors.text },
+  description: { fontSize: theme.typography.label, marginTop: theme.spacing.xs, color: theme.colors.textMuted, lineHeight: 21 },
   arrow: { fontSize: 26, color: theme.colors.accent }
 });

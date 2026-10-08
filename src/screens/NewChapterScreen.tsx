@@ -1,82 +1,34 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppButton, AppField } from '../components/FormControls';
 import { FeedbackState } from '../components/FeedbackState';
+import { TITLE_MAX_LENGTH, validateTitle } from '../data/contentValidation';
 import { theme } from '../theme';
 import { useAuth } from '../auth/AuthContext';
 import { canCreateChapter, SIGN_IN_REQUIRED_MESSAGE } from '../auth/permissions';
 
-type Props = {
-  nextNumber: number;
-  onCancel: () => void;
-  onCreate: (title: string) => void | Promise<void>;
-  creating?: boolean;
-  errorMessage?: string;
-};
-
-export function NewChapterScreen({ nextNumber, onCancel, onCreate, creating, errorMessage }: Props) {
+type Props = { nextNumber: number; onCancel: () => void; onCreate: (title: string) => void; creating?: boolean; errorMessage?: string; onDirtyChange: (dirty: boolean) => void };
+export function NewChapterScreen({ nextNumber, onCancel, onCreate, creating, errorMessage, onDirtyChange }: Props) {
   const [title, setTitle] = useState('');
+  const [validation, setValidation] = useState('');
   const { user } = useAuth();
-  const canCreate = title.trim().length > 0 && !creating;
-  if (!canCreateChapter(user)) return <FeedbackState kind="error" title="Acesso indisponível" message={SIGN_IN_REQUIRED_MESSAGE} actionLabel="Voltar aos capítulos" onAction={onCancel} />;
-
-  return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
-      {creating ? <FeedbackState kind="loading" title="Abrindo uma nova página" message="Criando seu capítulo e preparando o editor para você escrever." /> :
-      <View style={styles.card}>
-        <Text style={styles.label}>CAPÍTULO {nextNumber}</Text>
-        <Text style={styles.heading}>Novo capítulo</Text>
-        <Text style={styles.help}>Dê um título ao capítulo. Ele será salvo no dispositivo e aberto no editor.</Text>
-
-        <Text style={styles.inputLabel}>Título</Text>
-        <TextInput
-          accessibilityLabel="Título do novo capítulo"
-          autoFocus
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Ex.: A estrada para o norte"
-          placeholderTextColor={theme.colors.textMuted}
-          style={styles.input}
-          returnKeyType="done"
-          editable={!creating}
-          onSubmitEditing={() => canCreate && onCreate(title.trim())}
-        />
-
-        {errorMessage ? <Text style={styles.error} accessibilityLiveRegion="polite">{errorMessage}</Text> : null}
-
-        <View style={styles.actions}>
-          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={onCancel} disabled={creating}>
-            <Text style={styles.secondaryText}>Cancelar</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Criar capítulo"
-            style={[styles.primaryButton, !canCreate && styles.primaryDisabled]}
-            disabled={!canCreate}
-            onPress={() => onCreate(title.trim())}
-          >
-            <Text style={styles.primaryText}>{creating ? 'Criando...' : 'Criar capítulo'}</Text>
-          </Pressable>
-        </View>
-      </View>}
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
+  useEffect(() => onDirtyChange(title.length > 0), [title, onDirtyChange]);
+  if (!canCreateChapter(user)) return <FeedbackState kind="error" title="Acesso indisponível" message={SIGN_IN_REQUIRED_MESSAGE} actionLabel="Voltar" onAction={onCancel} />;
+  const submit = () => { if (creating) return; const error = validateTitle(title); setValidation(error ?? ''); if (!error) onCreate(title); };
+  return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}><View style={styles.card}>
+      <Text style={styles.eyebrow}>MANUSCRITO / CAPÍTULO {nextNumber}</Text>
+      <Text style={styles.title}>Uma nova página.</Text>
+      <Text style={styles.help}>Dê um título ao capítulo. Você poderá mudar o nome enquanto escreve.</Text>
+      <AppField label="Título do capítulo" value={title} onChangeText={setTitle} maxLength={TITLE_MAX_LENGTH} editable={!creating} placeholder="Ex.: A estrada para o norte" hint={title.length + '/' + TITLE_MAX_LENGTH + ' caracteres'} onSubmitEditing={submit} returnKeyType="done" />
+      {validation || errorMessage ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{validation || errorMessage}</Text> : null}
+      <AppButton label={creating ? 'Criando capítulo...' : 'Criar e começar a escrever'} busy={creating} onPress={submit} />
+      <AppButton label="Cancelar" secondary disabled={creating} onPress={onCancel} />
+    </View></ScrollView>
+  </KeyboardAvoidingView>;
 }
-
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 20, justifyContent: 'flex-start' },
-  card: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, padding: 18 },
-  label: { color: theme.colors.accent, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  heading: { color: theme.colors.text, fontSize: 24, fontWeight: '800', marginTop: 8 },
-  help: { color: theme.colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 8 },
-  inputLabel: { color: theme.colors.text, fontSize: 12, fontWeight: '800', marginTop: 20, marginBottom: 7 },
-  input: { borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background, borderRadius: theme.radius.md, paddingHorizontal: 14, paddingVertical: 13, color: theme.colors.text, fontSize: 15 },
-  error: { color: theme.colors.danger, fontSize: 12, lineHeight: 17, marginTop: 10 },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  secondaryButton: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 13, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border },
-  secondaryText: { color: theme.colors.text, fontWeight: '800' },
-  primaryButton: { flex: 1.4, alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 13, borderRadius: theme.radius.md, backgroundColor: theme.colors.primary },
-  primaryDisabled: { opacity: 0.45 },
-  primaryText: { color: theme.colors.white, fontWeight: '800' }
+  root: { flex: 1 }, content: { padding: theme.layout.page }, card: { padding: theme.spacing.xl, width: '100%', maxWidth: theme.layout.formWidth, alignSelf: 'center', borderRadius: theme.radius.lg, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
+  eyebrow: { color: theme.colors.accent, fontSize: theme.typography.caption, letterSpacing: 1 }, title: { fontFamily: theme.font.editorial, fontSize: theme.typography.heading, color: theme.colors.text, marginTop: theme.spacing.lg },
+  help: { color: theme.colors.textMuted, fontSize: theme.typography.label, lineHeight: 22, marginTop: theme.spacing.md }, error: { color: theme.colors.danger, fontSize: theme.typography.label, lineHeight: 22, marginTop: theme.spacing.lg }
 });

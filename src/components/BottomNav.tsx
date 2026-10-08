@@ -39,12 +39,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
-    paddingTop: 8,
-    paddingBottom: 10
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    gap: theme.spacing.xs
   },
   item: { flex: 1, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   icon: { fontSize: 19, color: theme.colors.textMuted },
-  label: { fontSize: 10, marginTop: 3, color: theme.colors.textMuted, fontWeight: '600' },
-  activeItem: { backgroundColor: theme.colors.primarySoft, borderRadius: 10, borderTopWidth: 2, borderTopColor: theme.colors.primary },
+  label: { fontSize: 11, marginTop: 3, color: theme.colors.textMuted, fontWeight: '600' },
+  activeItem: { backgroundColor: theme.colors.primarySoft, borderRadius: theme.radius.sm, borderBottomWidth: 2, borderBottomColor: theme.colors.primary },
   selected: { color: theme.colors.primary }
 });

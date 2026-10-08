@@ -25,7 +25,7 @@ export function SettingsScreen({ onOpenAdmin }: { onOpenAdmin: () => void }) {
         <Text style={styles.text}>Consulte usuários e verifique o banco local.</Text>
         <AuthButton label="Painel administrativo" onPress={onOpenAdmin} />
       </View> : null}
-      <View style={styles.card}><Text style={styles.title}>LoreBook · protótipo</Text><Text style={styles.text}>Versão {appConfig.expo.version} · inspirado no Ateliê Desktop.</Text><Text style={styles.text}>Capítulos salvos neste dispositivo. Notas temporárias; fichas e bíblia demonstrativas. Backup ainda indisponível.</Text></View>
+      <View style={styles.card}><Text accessibilityRole="header" style={styles.title}>Aplicativo</Text><Text style={styles.text}>LoreBook · versão {appConfig.expo.version}</Text><Text style={styles.text}>Biblioteca pessoal de histórias e manuscritos. Obras e capítulos salvos neste dispositivo. Notas temporárias; fichas e Bíblia demonstrativas.</Text></View>
       <View style={styles.card}>
         <Text style={styles.title}>Prévia dos estados</Text>
         <Text style={styles.text}>Demonstração visual do protótipo. Os exemplos abaixo não alteram suas obras.</Text>
@@ -35,6 +35,7 @@ export function SettingsScreen({ onOpenAdmin }: { onOpenAdmin: () => void }) {
           </Pressable>)}
         </View>
       </View>
+      {preview === 'loading' ? <AuthButton label="Concluir simulação de carregamento" secondary onPress={() => setPreview('success')} /> : null}
       <View style={styles.preview}>
         <FeedbackState kind={preview} {...examples[preview]}
           actionLabel={preview === 'error' ? 'Simular nova tentativa' : undefined}
@@ -45,10 +46,10 @@ export function SettingsScreen({ onOpenAdmin }: { onOpenAdmin: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { padding: 20, paddingBottom: 36 },
+  root: { padding: theme.layout.page, paddingBottom: theme.spacing.xxl, maxWidth: theme.layout.maxWidth, width: '100%', alignSelf: 'center' },
   card: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: 16, marginBottom: 12 },
-  title: { fontWeight: '800', color: theme.colors.text },
-  text: { color: theme.colors.textMuted, marginTop: 5, fontSize: 12, lineHeight: 19 },
+  title: { fontFamily: theme.font.editorial, fontSize: 22, color: theme.colors.text },
+  text: { color: theme.colors.textMuted, marginTop: theme.spacing.sm, fontSize: theme.typography.label, lineHeight: 22 },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 16 },
   option: { paddingHorizontal: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: theme.colors.surfaceMuted },
   active: { backgroundColor: theme.colors.primary },
