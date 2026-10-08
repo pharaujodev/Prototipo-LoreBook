@@ -1,20 +1,26 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme';
+import { useAuth } from '../auth/AuthContext';
+import { canWriteContent } from '../auth/permissions';
 
 type Props = {
+  readOnly?: boolean;
   notes: string;
   onChangeNotes: (value: string) => void;
 };
 
-export function NotesScreen({ notes, onChangeNotes }: Props) {
+export function NotesScreen({ readOnly = false, notes, onChangeNotes }: Props) {
+  const { user } = useAuth();
+  const canEdit = !readOnly && canWriteContent(user);
   return (
     <View style={styles.root}>
       <View style={styles.banner}>
         <Text style={styles.bannerTitle}>Espaço de planejamento</Text>
         <Text style={styles.bannerText}>Ideias fora do manuscrito. Neste protótipo, as notas ficam apenas nesta sessão.</Text>
+        {!canEdit ? <Text style={styles.bannerText}>Modo somente leitura</Text> : null}
       </View>
-      <TextInput accessibilityLabel="Notas da obra" placeholder="Uma ideia, uma pergunta, uma cena… Sua próxima descoberta pode começar aqui." placeholderTextColor={theme.colors.textMuted} multiline value={notes} onChangeText={onChangeNotes} textAlignVertical="top" style={styles.input} />
+      <TextInput accessibilityLabel="Notas da obra" editable={canEdit} placeholder="Uma ideia, uma pergunta, uma cena… Sua próxima descoberta pode começar aqui." placeholderTextColor={theme.colors.textMuted} multiline value={notes} onChangeText={onChangeNotes} textAlignVertical="top" style={styles.input} />
     </View>
   );
 }

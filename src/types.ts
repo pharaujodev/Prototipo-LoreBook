@@ -8,10 +8,13 @@ export type ScreenName =
   | 'characterDetail'
   | 'bible'
   | 'notes'
-  | 'settings';
+  | 'settings'
+  | 'admin'
+  | 'adminUserDetail';
 
 export type Project = {
   id: string;
+  ownerUserId: string;
   title: string;
   genre: string;
   progress: number;
@@ -49,7 +52,7 @@ export type BibleEntry = {
 };
 
 export type ProjectWorkspace = {
-  project: Project;
+  project: Omit<Project, 'ownerUserId'>;
   chapters: Chapter[];
   characters: Character[];
   bibleEntries: BibleEntry[];

@@ -1,8 +1,9 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 import { workspaces } from '../data/mock';
 import { countWords } from '../data/chapterDraft';
+import { USER_ROLES } from '../auth/authTypes';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 5;
 
 export async function initializeDatabase(db: SQLiteDatabase) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
@@ -49,6 +50,73 @@ export async function initializeDatabase(db: SQLiteDatabase) {
       for (const chapter of chapters) {
         await db.runAsync('UPDATE chapters SET words = ? WHERE id = ?', countWords(chapter.content), chapter.id);
       }
+    }
+    if (currentVersion < 3) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          password_hash TEXT NOT NULL,
+          password_salt TEXT NOT NULL,
+          role TEXT NOT NULL CHECK(role IN ('${USER_ROLES.ADMIN}', '${USER_ROLES.USER}')),
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS app_session (
+          singleton_id INTEGER PRIMARY KEY NOT NULL CHECK(singleton_id = 1),
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+        );
+      `);
+    }
+    if (currentVersion === 3) {
+      // O schema 3 usava CHECK AUTHOR/READER. Mantemos as tabelas originais como
+      // arquivo de compatibilidade; nenhuma tabela é apagada ou resetada.
+      await db.execAsync(`
+        ALTER TABLE app_session RENAME TO app_session_legacy_v3;
+        ALTER TABLE users RENAME TO users_legacy_v3;
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          password_hash TEXT NOT NULL,
+          password_salt TEXT NOT NULL,
+          role TEXT NOT NULL CHECK(role IN ('${USER_ROLES.ADMIN}', '${USER_ROLES.USER}')),
+          created_at TEXT NOT NULL
+        );
+        INSERT INTO users (id, name, email, password_hash, password_salt, role, created_at)
+          SELECT id, name, email, password_hash, password_salt,
+            CASE WHEN id = (SELECT id FROM users_legacy_v3 ORDER BY created_at ASC, rowid ASC LIMIT 1)
+              THEN '${USER_ROLES.ADMIN}' ELSE '${USER_ROLES.USER}' END, created_at
+          FROM users_legacy_v3 ORDER BY created_at ASC, rowid ASC;
+        CREATE TABLE app_session (
+          singleton_id INTEGER PRIMARY KEY NOT NULL CHECK(singleton_id = 1),
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+        );
+        INSERT INTO app_session SELECT singleton_id, user_id FROM app_session_legacy_v3;
+      `);
+    }
+    if (currentVersion < 5) {
+      const userColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(users)');
+      if (!userColumns.some((column) => column.name === 'status')) {
+        await db.execAsync("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'DISABLED'));");
+      }
+      const projectColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(projects)');
+      if (!projectColumns.some((column) => column.name === 'owner_user_id')) {
+        // Nullable só para o acervo legado anterior ao primeiro cadastro.
+        await db.execAsync('ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(id);');
+      }
+      await db.runAsync(`UPDATE projects SET owner_user_id =
+        (SELECT id FROM users WHERE role = ? ORDER BY created_at, rowid LIMIT 1)
+        WHERE owner_user_id IS NULL AND EXISTS (SELECT 1 FROM users WHERE role = ?)`, USER_ROLES.ADMIN, USER_ROLES.ADMIN);
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_user_id);
+        CREATE TRIGGER IF NOT EXISTS projects_require_owner_insert BEFORE INSERT ON projects
+          WHEN NEW.owner_user_id IS NULL BEGIN SELECT RAISE(ABORT, 'Obra requer proprietário'); END;
+        CREATE TRIGGER IF NOT EXISTS projects_require_owner_update BEFORE UPDATE OF owner_user_id ON projects
+          WHEN NEW.owner_user_id IS NULL BEGIN SELECT RAISE(ABORT, 'Obra requer proprietário'); END;
+      `);
+    }
+    if (currentVersion < DATABASE_VERSION) {
       await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION};`);
     }
   });

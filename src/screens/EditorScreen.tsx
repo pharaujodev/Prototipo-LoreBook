@@ -3,10 +3,13 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleShee
 import { Chapter, ChapterStatus, chapterStatuses } from '../types';
 import { countWords } from '../data/chapterDraft';
 import { theme } from '../theme';
+import { useAuth } from '../auth/AuthContext';
+import { canEditChapter } from '../auth/permissions';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
 type Props = {
+  readOnly?: boolean;
   chapter: Chapter;
   content: string;
   status: ChapterStatus;
@@ -16,7 +19,9 @@ type Props = {
   saveState: SaveState;
 };
 
-export function EditorScreen({ chapter, content, status, onChangeStatus, onChangeContent, onSave, saveState }: Props) {
+export function EditorScreen({ readOnly = false, chapter, content, status, onChangeStatus, onChangeContent, onSave, saveState }: Props) {
+  const { user } = useAuth();
+  const canEdit = !readOnly && canEditChapter(user);
   const words = countWords(content);
   const statusText =
     saveState === 'saving' ? 'Salvando no dispositivo...' :
@@ -34,8 +39,8 @@ export function EditorScreen({ chapter, content, status, onChangeStatus, onChang
       <View style={styles.statusOptions} accessibilityLabel="Status do capítulo">
         {chapterStatuses.map((option) => <Pressable key={option} accessibilityRole="radio"
           accessibilityLabel={option === 'Revisão' ? 'Em revisão' : option}
-          accessibilityState={{ checked: option === status, disabled: saveState === 'saving' }}
-          disabled={saveState === 'saving'} onPress={() => onChangeStatus(option)}
+          accessibilityState={{ checked: option === status, disabled: !canEdit || saveState === 'saving' }}
+          disabled={!canEdit || saveState === 'saving'} onPress={() => onChangeStatus(option)}
           style={[styles.statusOption, option === status && styles.statusOptionActive]}>
           <Text style={[styles.optionText, option === status && styles.optionTextActive]}>{option === 'Revisão' ? 'Em revisão' : option}</Text>
         </Pressable>)}
@@ -44,7 +49,7 @@ export function EditorScreen({ chapter, content, status, onChangeStatus, onChang
         accessibilityLabel={`Conteúdo do capítulo ${chapter.number}`}
         value={content}
         onChangeText={onChangeContent}
-        editable={saveState !== 'saving'}
+        editable={canEdit && saveState !== 'saving'}
         multiline
         textAlignVertical="top"
         placeholder="Comece a escrever..."
@@ -52,6 +57,7 @@ export function EditorScreen({ chapter, content, status, onChangeStatus, onChang
         style={styles.editor}
       />
       <View style={styles.footer}>
+        {!canEdit ? <Text style={styles.status}>Modo somente leitura</Text> : <>
         <View style={styles.statusBar} accessibilityLiveRegion="polite">
           {saveState === 'saving' ? <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: 8 }} /> : <View style={[styles.dot, saveState === 'error' && styles.dotError, saveState === 'dirty' && styles.dotDirty]} />}
           <Text style={[styles.status, saveState === 'error' && styles.statusError]}>{statusText}</Text>
@@ -65,6 +71,7 @@ export function EditorScreen({ chapter, content, status, onChangeStatus, onChang
         >
           <Text style={styles.saveText}>{saveState === 'saving' ? 'Salvando...' : saveState === 'saved' ? '✓ Tudo salvo' : saveState === 'error' ? 'Tentar salvar novamente' : 'Salvar capítulo'}</Text>
         </Pressable>
+        </>}
       </View>
     </KeyboardAvoidingView>
   );

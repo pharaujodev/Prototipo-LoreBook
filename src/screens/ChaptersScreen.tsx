@@ -3,8 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FeedbackState } from '../components/FeedbackState';
 import { Chapter } from '../types';
 import { theme } from '../theme';
+import { useAuth } from '../auth/AuthContext';
+import { canCreateChapter } from '../auth/permissions';
 
 type Props = {
+  readOnly?: boolean;
   chapters: Chapter[];
   loading?: boolean;
   errorMessage?: string;
@@ -13,7 +16,9 @@ type Props = {
   onCreateChapter: () => void;
 };
 
-export function ChaptersScreen({ chapters, loading, errorMessage, onRetry, onOpenChapter, onCreateChapter }: Props) {
+export function ChaptersScreen({ readOnly = false, chapters, loading, errorMessage, onRetry, onOpenChapter, onCreateChapter }: Props) {
+  const { user } = useAuth();
+  const canCreate = !readOnly && canCreateChapter(user);
   return (
     <ScrollView contentContainerStyle={styles.content}>
       {loading ? <FeedbackState kind="loading" title="Carregando capítulos" message="Lendo os capítulos salvos no dispositivo." /> : null}
@@ -21,7 +26,7 @@ export function ChaptersScreen({ chapters, loading, errorMessage, onRetry, onOpe
         <FeedbackState kind="error" title="Não foi possível carregar os capítulos" message={errorMessage} actionLabel="Tentar novamente" onAction={onRetry} />
       ) : null}
       {!loading && !errorMessage && chapters.length === 0 ? (
-        <FeedbackState kind="empty" title="Sua primeira página espera" message="Uma cena, uma voz, uma ideia. Crie o primeiro capítulo e dê início à sua história." actionLabel="Criar capítulo" onAction={onCreateChapter} />
+        <FeedbackState kind="empty" title="Sua primeira página espera" message={canCreate ? 'Uma cena, uma voz, uma ideia. Crie o primeiro capítulo e dê início à sua história.' : 'Esta obra ainda não tem capítulos para leitura.'} actionLabel={canCreate ? 'Criar capítulo' : undefined} onAction={canCreate ? onCreateChapter : undefined} />
       ) : null}
 
       {!loading && !errorMessage
@@ -46,7 +51,7 @@ export function ChaptersScreen({ chapters, loading, errorMessage, onRetry, onOpe
           ))
         : null}
 
-      {!loading && !errorMessage && chapters.length > 0 ? (
+      {canCreate && !loading && !errorMessage && chapters.length > 0 ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Criar novo capítulo" style={styles.addButton} onPress={onCreateChapter}>
           <Text style={styles.addText}>＋ Novo capítulo</Text>
         </Pressable>

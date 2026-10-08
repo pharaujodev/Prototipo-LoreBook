@@ -3,6 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FeedbackState } from '../components/FeedbackState';
 import { theme } from '../theme';
 import { Project } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { roleLabels } from '../auth/authTypes';
+import { canWriteContent } from '../auth/permissions';
 
 type Props = {
   projects: Project[];
@@ -10,16 +13,21 @@ type Props = {
   errorMessage?: string;
   onRetry: () => void;
   onOpenProject: (projectId: string) => void;
+  onSettings: () => void;
 };
 
-export function ProjectsScreen({ projects, loading, errorMessage, onRetry, onOpenProject }: Props) {
+export function ProjectsScreen({ projects, loading, errorMessage, onRetry, onOpenProject, onSettings }: Props) {
+  const { user } = useAuth();
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>LOREBOOK / ATELIÊ DE HISTÓRIAS</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Conta e configurações" onPress={onSettings} style={styles.account}>
+        <Text style={styles.accountText}>{user?.name} · {user ? roleLabels[user.role] : ''} · Configurações</Text>
+      </Pressable>
       <Text style={styles.title}>Histórias em suas mãos.</Text>
       <Text style={styles.subtitle}>Continue escrevendo de onde parou.</Text>
 
-      <Pressable
+      {canWriteContent(user) ? <Pressable
         accessibilityRole="button"
         accessibilityLabel="Nova obra, disponível em breve"
         accessibilityState={{ disabled: true }}
@@ -29,9 +37,9 @@ export function ProjectsScreen({ projects, loading, errorMessage, onRetry, onOpe
         <Text style={styles.newButtonPlus}>＋</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.newButtonTitle}>Nova obra</Text>
-          <Text style={styles.newButtonText}>Em breve · explore as obras de exemplo</Text>
+          <Text style={styles.newButtonText}>Em breve · criação de obras</Text>
         </View>
-      </Pressable>
+      </Pressable> : <Text style={styles.subtitle}>Modo somente leitura</Text>}
 
       <Text style={styles.sectionTitle}>Recentes</Text>
 
@@ -40,7 +48,7 @@ export function ProjectsScreen({ projects, loading, errorMessage, onRetry, onOpe
         <FeedbackState kind="error" title="Não foi possível carregar as obras" message={errorMessage} actionLabel="Tentar novamente" onAction={onRetry} />
       ) : null}
       {!loading && !errorMessage && projects.length === 0 ? (
-        <FeedbackState kind="empty" title="Uma estante de possibilidades" message="Não há obras neste dispositivo. A criação de novas obras estará disponível em uma próxima etapa." />
+        <FeedbackState kind="empty" title="Uma estante de possibilidades" message="Sua conta ainda não possui obras. A criação de novas obras estará disponível em uma próxima etapa." />
       ) : null}
 
       {!loading && !errorMessage
@@ -76,6 +84,8 @@ function formatUpdatedAt(value: string) {
 
 const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
+  account: { minHeight: 44, justifyContent: 'center', paddingVertical: 10 },
+  accountText: { color: theme.colors.primary, fontSize: 13, fontWeight: '700' },
   eyebrow: { color: theme.colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.2, marginTop: 8 },
   title: { fontSize: 36, fontFamily: theme.font.editorial, color: theme.colors.text, marginTop: 8 },
   subtitle: { color: theme.colors.textMuted, marginTop: 6, marginBottom: 22 },

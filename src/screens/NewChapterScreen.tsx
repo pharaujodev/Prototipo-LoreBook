@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { FeedbackState } from '../components/FeedbackState';
 import { theme } from '../theme';
+import { useAuth } from '../auth/AuthContext';
+import { canCreateChapter, SIGN_IN_REQUIRED_MESSAGE } from '../auth/permissions';
 
 type Props = {
   nextNumber: number;
@@ -13,7 +15,9 @@ type Props = {
 
 export function NewChapterScreen({ nextNumber, onCancel, onCreate, creating, errorMessage }: Props) {
   const [title, setTitle] = useState('');
+  const { user } = useAuth();
   const canCreate = title.trim().length > 0 && !creating;
+  if (!canCreateChapter(user)) return <FeedbackState kind="error" title="Acesso indisponível" message={SIGN_IN_REQUIRED_MESSAGE} actionLabel="Voltar aos capítulos" onAction={onCancel} />;
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

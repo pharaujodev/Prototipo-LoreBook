@@ -1,14 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, Platform, StyleSheet, Text, View } from 'react-native';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNav } from './src/components/BottomNav';
 import { FeedbackState } from './src/components/FeedbackState';
 import { ScreenHeader } from './src/components/ScreenHeader';
 import { UnsavedChangesModal } from './src/components/UnsavedChangesModal';
-import { initializeDatabase } from './src/db/database';
-import { createChapter as insertChapter, listChapters, listProjects, saveChapter } from './src/db/repositories';
+import { DatabaseGate } from './src/db/DatabaseGate';
+import { listChapters, listProjects } from './src/db/repositories';
+import { useProjectAccess } from './src/auth/useProjectAccess';
+import { listChaptersAsAdmin } from './src/admin/adminRepository';
+import { AdminUserDetailScreen } from './src/screens/AdminUserDetailScreen';
+import { AuthProvider } from './src/auth/AuthContext';
+import { AuthGate } from './src/auth/AuthGate';
+import { useAuthorization } from './src/auth/useAuthorization';
+import { createChapterForUser, saveChapterForUser } from './src/auth/chapterActions';
 import { ChapterDraft, hasUnsavedChanges } from './src/data/chapterDraft';
 import { workspaces } from './src/data/mock';
 import { BibleScreen } from './src/screens/BibleScreen';
@@ -20,25 +27,30 @@ import { NewChapterScreen } from './src/screens/NewChapterScreen';
 import { NotesScreen } from './src/screens/NotesScreen';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { AdminScreen } from './src/screens/AdminScreen';
 import { WorkHomeScreen } from './src/screens/WorkHomeScreen';
 import { theme } from './src/theme';
 import { Chapter, Project, ScreenName } from './src/types';
 
 type WorkTab = 'home' | 'chapters' | 'characters' | 'bible' | 'notes';
 
-const DEFAULT_WORKSPACE = workspaces[0]!;
+const workScreens = new Set<ScreenName>(['workHome', 'chapters', 'newChapter', 'editor', 'characters', 'characterDetail', 'bible', 'notes']);
 
 function PrototypeApp({ db }: { db: SQLiteDatabase }) {
+  const { user, requireAdmin, permissionMessage } = useAuthorization();
+  const { project: openedProject, administrative, opening, accessError, open: openProject, requireProjectWrite: requireWrite } = useProjectAccess(db);
+  const [adminUserId, setAdminUserId] = useState('');
   const [screen, setScreen] = useState<ScreenName>('projects');
+  const [settingsOrigin, setSettingsOrigin] = useState<'projects' | 'workHome'>('projects');
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState('');
-  const [selectedProjectId, setSelectedProjectId] = useState(DEFAULT_WORKSPACE.project.id);
+  const selectedProjectId = openedProject?.id;
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(false);
   const [chaptersError, setChaptersError] = useState('');
   const [selectedChapterId, setSelectedChapterId] = useState('');
-  const [selectedCharacterId, setSelectedCharacterId] = useState(DEFAULT_WORKSPACE.characters[0]?.id ?? '');
+  const [selectedCharacterId, setSelectedCharacterId] = useState('');
   const [chapterDrafts, setChapterDrafts] = useState<Record<string, ChapterDraft>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -52,19 +64,19 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
   );
 
   const selectedWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace.project.id === selectedProjectId) ?? DEFAULT_WORKSPACE,
+    () => workspaces.find((workspace) => workspace.project.id === selectedProjectId),
     [selectedProjectId]
   );
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? selectedWorkspace.project,
-    [projects, selectedProjectId, selectedWorkspace.project]
+    () => projects.find((project) => project.id === selectedProjectId) ?? openedProject,
+    [projects, selectedProjectId, openedProject]
   );
   const selectedChapter = useMemo(
     () => chapters.find((chapter) => chapter.id === selectedChapterId),
     [chapters, selectedChapterId]
   );
   const selectedCharacter = useMemo(
-    () => selectedWorkspace.characters.find((character) => character.id === selectedCharacterId) ?? selectedWorkspace.characters[0],
+    () => selectedWorkspace?.characters.find((character) => character.id === selectedCharacterId) ?? selectedWorkspace?.characters[0],
     [selectedCharacterId, selectedWorkspace]
   );
 
@@ -72,26 +84,26 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
     setProjectsLoading(true);
     setProjectsError('');
     try {
-      const result = await listProjects(db);
+      const result = await listProjects(db, user);
       setProjects(result);
     } catch {
       setProjectsError('Os projetos salvos não puderam ser lidos do banco local.');
     } finally {
       setProjectsLoading(false);
     }
-  }, [db]);
+  }, [db, user]);
 
   useEffect(() => {
     void loadProjectsFromDatabase();
   }, [loadProjectsFromDatabase]);
 
-  const loadProjectChapters = useCallback(async (projectId: string) => {
+  const loadProjectChapters = useCallback(async (projectId: string, asAdmin = administrative) => {
     const request = ++chaptersRequest.current;
     setChaptersLoading(true);
     setChaptersError('');
     setChapters([]);
     try {
-      const result = await listChapters(db, projectId);
+      const result = asAdmin ? await listChaptersAsAdmin(db, user, projectId) : await listChapters(db, projectId, user);
       if (request !== chaptersRequest.current) return;
       setChapters(result);
       setSelectedChapterId(result[0]?.id ?? '');
@@ -102,18 +114,22 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
     } finally {
       if (request === chaptersRequest.current) setChaptersLoading(false);
     }
-  }, [db]);
+  }, [db, user, administrative]);
 
-  const openWork = async (projectId: string) => {
-    const workspace = workspaces.find((item) => item.project.id === projectId) ?? DEFAULT_WORKSPACE;
-    setSelectedProjectId(projectId);
-    setSelectedCharacterId(workspace.characters[0]?.id ?? '');
+  const openWork = async (projectId: string, asAdmin = false) => {
+    const project = await openProject(projectId, asAdmin);
+    if (!project) return;
+    const workspace = workspaces.find((item) => item.project.id === projectId);
+    setSelectedCharacterId(workspace?.characters[0]?.id ?? '');
     setScreen('workHome');
-    await loadProjectChapters(projectId);
+    await loadProjectChapters(projectId, asAdmin);
   };
 
   const navigate = (next: ScreenName) => {
     if (mutationInFlight.current) return;
+    if (next === 'newChapter' && !requireWrite()) return;
+    if ((next === 'admin' || next === 'adminUserDetail') && !requireAdmin()) return;
+    if (workScreens.has(next) && !selectedProject) return;
     if (screen === 'editor' && selectedChapter && hasUnsavedChanges(selectedChapter, chapterDrafts[selectedChapter.id])) {
       setPendingScreen(next);
     } else setScreen(next);
@@ -137,7 +153,10 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
     if (screen === 'projects') return false;
     if (screen === 'editor' || screen === 'newChapter') navigate('chapters');
     else if (screen === 'characterDetail') navigate('characters');
-    else if (screen === 'workHome') navigate('projects');
+    else if (screen === 'workHome') navigate(administrative ? 'adminUserDetail' : 'projects');
+    else if (screen === 'settings') navigate(settingsOrigin);
+    else if (screen === 'admin') navigate('settings');
+    else if (screen === 'adminUserDetail') navigate('admin');
     else navigate('workHome');
     return true;
   };
@@ -149,12 +168,13 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
   });
 
   const createChapter = async (title: string) => {
+    if (!selectedProject || !requireWrite()) return;
     if (mutationInFlight.current) return;
     mutationInFlight.current = true;
     setCreatingChapter(true);
     setCreateChapterError('');
     try {
-      const chapter = await insertChapter(db, selectedProject.id, title);
+      const chapter = await createChapterForUser(db, user, selectedProject.id, title);
       setChapters((current) => [...current, chapter]);
       setChapterDrafts((current) => ({ ...current, [chapter.id]: { content: chapter.content, status: chapter.status } }));
       setSelectedChapterId(chapter.id);
@@ -170,13 +190,14 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
   };
 
   const saveSelectedChapter = async (): Promise<boolean> => {
+    if (!selectedProject || !requireWrite()) return false;
     if (!selectedChapter || mutationInFlight.current) return false;
     mutationInFlight.current = true;
     setSaving(true);
     setSaveError('');
     const draft = chapterDrafts[selectedChapter.id] ?? { content: selectedChapter.content, status: selectedChapter.status };
     try {
-      const words = await saveChapter(db, selectedProject.id, selectedChapter.id, draft);
+      const words = await saveChapterForUser(db, user, selectedProject.id, selectedChapter.id, draft);
       setChapters((current) => current.map((chapter) => chapter.id === selectedChapter.id ? { ...chapter, ...draft, words } : chapter));
       await loadProjectsFromDatabase();
       return true;
@@ -210,33 +231,40 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <ExpoStatusBar style="dark" />
       <View style={styles.app}>
+        {opening ? <Text accessibilityLiveRegion="polite" style={styles.permission}>Abrindo obra...</Text> : null}
+        {accessError ? <Text accessibilityRole="alert" style={styles.permission}>{accessError}</Text> : null}
+        {administrative && workScreens.has(screen) ? <Text style={styles.context}>Visualizando como administrador · somente consulta</Text> : null}
+        {permissionMessage ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.permission}>{permissionMessage}</Text> : null}
         {screen === 'projects' ? (
-          <ProjectsScreen projects={projects} loading={projectsLoading} errorMessage={projectsError} onRetry={loadProjectsFromDatabase} onOpenProject={openWork} />
-        ) : (
+          <ProjectsScreen projects={projects} loading={projectsLoading} errorMessage={projectsError} onRetry={loadProjectsFromDatabase} onOpenProject={(id) => { void openWork(id); }} onSettings={() => { setSettingsOrigin('projects'); navigate('settings'); }} />
+        ) : !workScreens.has(screen) || selectedProject ? (
           <>
             {screen === 'workHome' ? (
               <ScreenHeader
                 title="Minha obra"
-                subtitle={selectedProject.title}
+                subtitle={selectedProject?.title}
                 canGoBack
-                onBack={() => setScreen('projects')}
+                onBack={() => navigate(administrative ? 'adminUserDetail' : 'projects')}
                 rightLabel="⚙"
-                onRightPress={() => setScreen('settings')}
+                onRightPress={() => { setSettingsOrigin('workHome'); navigate('settings'); }}
               />
             ) : null}
-            {screen === 'chapters' ? <ScreenHeader title="Capítulos" subtitle={selectedProject.title} canGoBack onBack={goBackToWork} /> : null}
-            {screen === 'newChapter' ? <ScreenHeader title="Novo capítulo" subtitle={selectedProject.title} canGoBack onBack={() => navigate('chapters')} /> : null}
-            {screen === 'editor' ? <ScreenHeader title="Editor" subtitle={selectedProject.title} canGoBack onBack={() => navigate('chapters')} /> : null}
-            {screen === 'characters' ? <ScreenHeader title="Personagens" subtitle={selectedProject.title} canGoBack onBack={goBackToWork} /> : null}
-            {screen === 'characterDetail' && selectedCharacter ? <ScreenHeader title="Ficha" subtitle={selectedProject.title} canGoBack onBack={() => setScreen('characters')} /> : null}
-            {screen === 'bible' ? <ScreenHeader title="Bíblia da obra" subtitle={selectedProject.title} canGoBack onBack={goBackToWork} /> : null}
-            {screen === 'notes' ? <ScreenHeader title="Rascunhos e notas" subtitle={selectedProject.title} canGoBack onBack={goBackToWork} /> : null}
-            {screen === 'settings' ? <ScreenHeader title="Configurações" subtitle="Protótipo" canGoBack onBack={goBackToWork} /> : null}
+            {screen === 'chapters' ? <ScreenHeader title="Capítulos" subtitle={selectedProject?.title} canGoBack onBack={goBackToWork} /> : null}
+            {screen === 'newChapter' ? <ScreenHeader title="Novo capítulo" subtitle={selectedProject?.title} canGoBack onBack={() => navigate('chapters')} /> : null}
+            {screen === 'editor' ? <ScreenHeader title="Editor" subtitle={selectedProject?.title} canGoBack onBack={() => navigate('chapters')} /> : null}
+            {screen === 'characters' ? <ScreenHeader title="Personagens" subtitle={selectedProject?.title} canGoBack onBack={goBackToWork} /> : null}
+            {screen === 'characterDetail' && selectedCharacter ? <ScreenHeader title="Ficha" subtitle={selectedProject?.title} canGoBack onBack={() => setScreen('characters')} /> : null}
+            {screen === 'bible' ? <ScreenHeader title="Bíblia da obra" subtitle={selectedProject?.title} canGoBack onBack={goBackToWork} /> : null}
+            {screen === 'notes' ? <ScreenHeader title="Rascunhos e notas" subtitle={selectedProject?.title} canGoBack onBack={goBackToWork} /> : null}
+            {screen === 'settings' ? <ScreenHeader title="Configurações" subtitle="Protótipo" canGoBack onBack={() => navigate(settingsOrigin)} /> : null}
+            {screen === 'adminUserDetail' ? <ScreenHeader title="Usuário e obras" subtitle="Administração" canGoBack onBack={() => navigate('admin')} /> : null}
+            {screen === 'admin' ? <ScreenHeader title="Administração" subtitle="Contas e banco local" canGoBack onBack={() => navigate('settings')} /> : null}
 
             <View style={styles.content}>
-              {screen === 'workHome' ? <WorkHomeScreen project={selectedProject} chapters={chapters} loading={chaptersLoading} errorMessage={chaptersError} onRetry={() => loadProjectChapters(selectedProject.id)} navigate={navigate} /> : null}
-              {screen === 'chapters' ? (
+              {screen === 'workHome' && selectedProject ? <WorkHomeScreen readOnly={administrative} project={selectedProject} chapters={chapters} loading={chaptersLoading} errorMessage={chaptersError} onRetry={() => loadProjectChapters(selectedProject.id)} navigate={navigate} /> : null}
+              {screen === 'chapters' && selectedProject ? (
                 <ChaptersScreen
+                  readOnly={administrative}
                   chapters={chapters}
                   loading={chaptersLoading}
                   errorMessage={chaptersError}
@@ -250,7 +278,7 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
                   }}
                   onCreateChapter={() => {
                     setCreateChapterError('');
-                    setScreen('newChapter');
+                    navigate('newChapter');
                   }}
                 />
               ) : null}
@@ -265,16 +293,19 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
               ) : null}
               {screen === 'editor' && selectedChapter && selectedDraft ? (
                 <EditorScreen
+                  readOnly={administrative}
                   chapter={selectedChapter}
                   content={selectedDraft.content}
                   status={selectedDraft.status}
                   saveState={editorSaveState}
                   onSave={async () => { await saveSelectedChapter(); }}
                   onChangeStatus={(status) => {
+                    if (!requireWrite()) return;
                     setChapterDrafts((current) => ({ ...current, [selectedChapter.id]: { ...selectedDraft, status } }));
                     setSaveError('');
                   }}
                   onChangeContent={(value) => {
+                    if (!requireWrite()) return;
                     setChapterDrafts((current) => ({ ...current, [selectedChapter.id]: { ...selectedDraft, content: value } }));
                     setSaveError('');
                   }}
@@ -283,7 +314,7 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
               {screen === 'editor' && !selectedChapter ? <FeedbackState kind="empty" title="Capítulo indisponível" message="Volte ao manuscrito e selecione um capítulo para continuar." actionLabel="Ver capítulos" onAction={() => navigate('chapters')} /> : null}
               {screen === 'characters' ? (
                 <CharactersScreen
-                  characters={selectedWorkspace.characters}
+                  characters={selectedWorkspace?.characters ?? []}
                   onOpenCharacter={(id) => {
                     setSelectedCharacterId(id);
                     setScreen('characterDetail');
@@ -291,19 +322,22 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
                 />
               ) : null}
               {screen === 'characterDetail' && selectedCharacter ? <CharacterDetailScreen character={selectedCharacter} /> : null}
-              {screen === 'bible' ? <BibleScreen entries={selectedWorkspace.bibleEntries} /> : null}
-              {screen === 'notes' ? (
+              {screen === 'bible' ? <BibleScreen entries={selectedWorkspace?.bibleEntries ?? []} /> : null}
+              {screen === 'notes' && selectedProject ? (
                 <NotesScreen
+                  readOnly={administrative}
                   notes={notesByProject[selectedProject.id] ?? ''}
-                  onChangeNotes={(value) => setNotesByProject((current) => ({ ...current, [selectedProject.id]: value }))}
+                  onChangeNotes={(value) => { if (requireWrite()) setNotesByProject((current) => ({ ...current, [selectedProject.id]: value })); }}
                 />
               ) : null}
-              {screen === 'settings' ? <SettingsScreen /> : null}
+              {screen === 'settings' ? <SettingsScreen onOpenAdmin={() => navigate('admin')} /> : null}
+              {screen === 'admin' ? <AdminScreen db={db} onBack={() => navigate('settings')} onOpenUser={(id) => { if (!requireAdmin()) return; setAdminUserId(id); navigate('adminUserDetail'); }} /> : null}
+              {screen === 'adminUserDetail' ? <AdminUserDetailScreen db={db} userId={adminUserId} onBack={() => navigate('admin')} onOpenProject={(id) => { if (requireAdmin()) void openWork(id, true); }} /> : null}
             </View>
 
             {activeTab && screen !== 'settings' && screen !== 'editor' && screen !== 'newChapter' ? <BottomNav active={activeTab} onChange={handleTab} /> : null}
           </>
-        )}
+        ) : <FeedbackState kind="error" title="Obra indisponível" message="Selecione uma obra da sua conta para continuar." actionLabel="Ver obras" onAction={() => setScreen('projects')} />}
       </View>
       <UnsavedChangesModal visible={pendingScreen !== null} saving={saving} error={saveError}
         onStay={() => setPendingScreen(null)}
@@ -318,42 +352,9 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
 }
 
 export default function App() {
-  const [db, setDb] = useState<SQLiteDatabase | null>(null);
-  const [error, setError] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    let settled = false;
-    let database: SQLiteDatabase | undefined;
-    async function prepare() {
-      try {
-        database = await openDatabaseAsync('lorebook.db');
-        await initializeDatabase(database);
-        if (!cancelled) setDb(database);
-      } catch {
-        if (!cancelled) setError(true);
-      } finally {
-        settled = true;
-        if (cancelled) void database?.closeAsync().catch(() => {});
-      }
-    }
-    void prepare();
-    return () => { cancelled = true; if (settled) void database?.closeAsync().catch(() => {}); };
-  }, [attempt]);
   return (
     <SafeAreaProvider>
-      {db ? <PrototypeApp db={db} /> : (
-        <SafeAreaView style={styles.feedbackRoot}>
-          <ExpoStatusBar style="dark" />
-          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-          <FeedbackState kind={error ? 'error' : 'loading'}
-            title={error ? 'Não conseguimos abrir seu ateliê' : 'Abrindo seu ateliê'}
-            message={error ? 'O armazenamento não respondeu. Tente abrir novamente para acessar suas obras.' : 'Preparando suas obras e deixando tudo pronto para a próxima página.'}
-            actionLabel={error ? 'Tentar novamente' : undefined}
-            onAction={error ? () => { setError(false); setAttempt((value) => value + 1); } : undefined} />
-          </ScrollView>
-        </SafeAreaView>
-      )}
+      <DatabaseGate>{(db) => <AuthProvider db={db}><AuthGate><PrototypeApp db={db} /></AuthGate></AuthProvider>}</DatabaseGate>
     </SafeAreaProvider>
   );
 }
@@ -362,5 +363,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
   app: { flex: 1, backgroundColor: theme.colors.background },
   content: { flex: 1 },
-  feedbackRoot: { flex: 1, justifyContent: 'center', backgroundColor: theme.colors.background }
+  context: { padding: 12, color: theme.colors.primary, backgroundColor: theme.colors.primarySoft, fontSize: 13 },
+  permission: { padding: 12, color: theme.colors.danger, backgroundColor: theme.colors.dangerSoft, fontSize: 13 }
 });

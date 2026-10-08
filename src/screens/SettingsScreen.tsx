@@ -3,8 +3,13 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FeedbackState } from '../components/FeedbackState';
 import appConfig from '../../app.json';
 import { theme } from '../theme';
+import { AccountCard } from '../components/AccountCard';
+import { AuthButton } from '../components/AuthForm';
+import { useAuth } from '../auth/AuthContext';
+import { canAccessAdminPanel } from '../auth/permissions';
 
-export function SettingsScreen() {
+export function SettingsScreen({ onOpenAdmin }: { onOpenAdmin: () => void }) {
+  const { user } = useAuth();
   const [preview, setPreview] = useState<'loading' | 'empty' | 'error' | 'success'>('empty');
   const examples = {
     loading: { title: 'Abrindo sua história', message: 'Reunindo os capítulos e preparando seu espaço de escrita.' },
@@ -14,7 +19,13 @@ export function SettingsScreen() {
   };
   return (
     <ScrollView contentContainerStyle={styles.root}>
-      <View style={styles.card}><Text style={styles.title}>LoreBook · v2 hotfix</Text><Text style={styles.text}>Versão {appConfig.expo.version} · inspirado no Ateliê Desktop.</Text><Text style={styles.text}>Capítulos salvos neste dispositivo. Notas temporárias; fichas e bíblia demonstrativas. Backup ainda indisponível.</Text></View>
+      <AccountCard />
+      {canAccessAdminPanel(user) ? <View style={styles.card}>
+        <Text style={styles.title}>Administração</Text>
+        <Text style={styles.text}>Consulte usuários e verifique o banco local.</Text>
+        <AuthButton label="Painel administrativo" onPress={onOpenAdmin} />
+      </View> : null}
+      <View style={styles.card}><Text style={styles.title}>LoreBook · protótipo</Text><Text style={styles.text}>Versão {appConfig.expo.version} · inspirado no Ateliê Desktop.</Text><Text style={styles.text}>Capítulos salvos neste dispositivo. Notas temporárias; fichas e bíblia demonstrativas. Backup ainda indisponível.</Text></View>
       <View style={styles.card}>
         <Text style={styles.title}>Prévia dos estados</Text>
         <Text style={styles.text}>Demonstração visual do protótipo. Os exemplos abaixo não alteram suas obras.</Text>

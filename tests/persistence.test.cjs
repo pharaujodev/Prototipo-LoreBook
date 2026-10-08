@@ -1,37 +1,24 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { DatabaseSync } = require('node:sqlite');
+const { database } = require('./helpers.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const ts = require('typescript');
-
-// Executa o código de produção sobre SQLite real; substitui somente a ponte nativa do Expo.
-require.extensions['.ts'] = (module, filename) => {
-  const { outputText } = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
-  });
-  module._compile(outputText, filename);
-};
-const { initializeDatabase } = require('../src/db/database.ts');
-const { createChapter, saveChapter, listProjects, listChapters } = require('../src/db/repositories.ts');
-const { hasUnsavedChanges } = require('../src/data/chapterDraft.ts');
-
-function database(filename = ':memory:') {
-  const sqlite = new DatabaseSync(filename);
-  return {
-    close: () => sqlite.close(),
-    execAsync: async (sql) => sqlite.exec(sql),
-    getAllAsync: async (sql, ...params) => sqlite.prepare(sql).all(...params),
-    getFirstAsync: async (sql, ...params) => sqlite.prepare(sql).get(...params),
-    runAsync: async (sql, ...params) => sqlite.prepare(sql).run(...params),
-    async withTransactionAsync(action) {
-      sqlite.exec('BEGIN');
-      try { await action(); sqlite.exec('COMMIT'); }
-      catch (error) { sqlite.exec('ROLLBACK'); throw error; }
-    }
-  };
+const { initializeDatabase: migrate } = require('../src/db/database.ts');
+const { registerUser, authenticateUser } = require('../src/auth/authRepository.ts');
+const actors = new WeakMap();
+const credentials = { name: 'Teste', email: 'teste@example.test', password: 'Senha123', confirmPassword: 'Senha123' };
+async function initializeDatabase(db) {
+  await migrate(db);
+  const count = await db.getFirstAsync('SELECT COUNT(*) AS count FROM users');
+  actors.set(db, count.count ? await authenticateUser(db, credentials) : await registerUser(db, credentials));
 }
+const repositories = require('../src/db/repositories.ts');
+const listProjects = (db) => repositories.listProjects(db, actors.get(db));
+const listChapters = (db, id) => repositories.listChapters(db, id, actors.get(db));
+const createChapter = (db, id, title) => repositories.createChapter(db, id, title, actors.get(db));
+const saveChapter = (db, id, chapter, draft) => repositories.saveChapter(db, id, chapter, draft, actors.get(db));
+const { hasUnsavedChanges } = require('../src/data/chapterDraft.ts');
 
 test('inicialização idempotente, contagens reais e isolamento entre obras', async () => {
   const db = database();
@@ -92,7 +79,7 @@ test('migração da v1 preserva texto, título e status existentes', async () =>
     assert.equal(chapter.content, 'Texto do usuário');
     assert.equal(chapter.status, 'Revisão');
     assert.equal(chapter.words, 3);
-    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 2);
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 5);
   } finally { db.close(); }
 });
 

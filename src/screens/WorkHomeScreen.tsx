@@ -4,8 +4,11 @@ import { FeatureCard } from '../components/FeatureCard';
 import { FeedbackState } from '../components/FeedbackState';
 import { theme } from '../theme';
 import { Chapter, Project, ScreenName } from '../types';
+import { useAuth } from '../auth/AuthContext';
+import { canCreateChapter } from '../auth/permissions';
 
 type Props = {
+  readOnly?: boolean;
   project: Project;
   chapters: Chapter[];
   loading: boolean;
@@ -14,7 +17,9 @@ type Props = {
   navigate: (screen: ScreenName) => void;
 };
 
-export function WorkHomeScreen({ project, chapters, loading, errorMessage, onRetry, navigate }: Props) {
+export function WorkHomeScreen({ readOnly = false, project, chapters, loading, errorMessage, onRetry, navigate }: Props) {
+  const { user } = useAuth();
+  const canCreate = !readOnly && canCreateChapter(user);
   const totalWords = chapters.reduce((sum, chapter) => sum + chapter.words, 0);
   if (loading || errorMessage) return <ScrollView contentContainerStyle={styles.feedback}>
     <FeedbackState kind={loading ? 'loading' : 'error'} title={loading ? 'Abrindo sua história' : 'Sua obra precisa de mais um instante'}
@@ -34,7 +39,7 @@ export function WorkHomeScreen({ project, chapters, loading, errorMessage, onRet
           <View><Text style={styles.metricValue}>{project.progress}%</Text><Text style={styles.metricLabel}>concluído</Text></View>
         </View>
       </View>
-      {chapters.length === 0 ? <FeedbackState kind="empty" title="Toda história começa com uma página" message="Sua obra já tem um lugar. Agora, dê espaço ao primeiro capítulo." actionLabel="Criar primeiro capítulo" onAction={() => navigate('newChapter')} /> : null}
+      {chapters.length === 0 ? <FeedbackState kind="empty" title="Toda história começa com uma página" message={canCreate ? 'Sua obra já tem um lugar. Agora, dê espaço ao primeiro capítulo.' : 'Ainda não há capítulos disponíveis para leitura.'} actionLabel={canCreate ? 'Criar primeiro capítulo' : undefined} onAction={canCreate ? () => navigate('newChapter') : undefined} /> : null}
 
       <Text style={styles.sectionTitle}>Organize sua história</Text>
       <FeatureCard icon="☰" title="Capítulos" description="Escreva, revise e acompanhe o manuscrito." onPress={() => navigate('chapters')} />
