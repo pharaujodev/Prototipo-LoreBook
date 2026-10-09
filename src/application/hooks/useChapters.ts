@@ -3,14 +3,13 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { useAuth } from '../contexts/AuthContext';
 import { useFeedback } from '../contexts/FeedbackContext';
 import { listChapters, createChapter, saveChapter, deleteChapter } from '../../data/repositories/contentRepository';
-import { listChaptersAsAdmin } from '../../data/repositories/adminRepository';
 import { ChapterDraft, draftFromChapter, hasUnsavedChanges } from '../../domain/validation/chapterDraft';
 import { contentError } from '../../domain/validation/contentValidation';
 import { PermissionError } from '../../domain/permissions/permissions';
 import { Chapter } from '../../domain/types/content';
 
 // Estado do manuscrito: consultas, rascunho, bloqueio de duplo envio e mutações.
-export function useChapters(db: SQLiteDatabase, projectId: string | undefined, administrative: boolean, requireWrite: () => boolean) {
+export function useChapters(db: SQLiteDatabase, projectId: string | undefined, requireWrite: () => boolean) {
   const { user } = useAuth();
   const { notify } = useFeedback();
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -26,15 +25,15 @@ export function useChapters(db: SQLiteDatabase, projectId: string | undefined, a
   const selected = chapters.find((item) => item.id === selectedId);
   const draft = selected ? drafts[selected.id] ?? draftFromChapter(selected) : undefined;
   const dirty = !!selected && hasUnsavedChanges(selected, draft);
-  const load = useCallback(async (id: string, asAdmin = administrative) => {
+  const load = useCallback(async (id: string) => {
     const current = ++request.current;
     setLoading(true); setError(''); setChapters([]); setSelectedId('');
     try {
-      const result = asAdmin ? await listChaptersAsAdmin(db, user, id) : await listChapters(db, id, user);
+      const result = await listChapters(db, id, user);
       if (current === request.current) setChapters(result);
     } catch (failure) { if (current === request.current) setError(contentError(failure, 'Não foi possível carregar os capítulos. Tente novamente.')); }
     finally { if (current === request.current) setLoading(false); }
-  }, [db, user, administrative]);
+  }, [db, user]);
   const select = (id: string) => {
     if (locked.current) return;
     setSelectedId(id); setSaveError('');

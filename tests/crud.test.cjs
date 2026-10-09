@@ -19,6 +19,34 @@ async function setup(db) {
 }
 async function fixture(action) { const db = database(); try { await action(db, await setup(db)); } finally { db.close(); } }
 
+for (const role of ['admin', 'user']) {
+  test(`${role.toUpperCase()}: proprietário mantém todo o CRUD de obras e capítulos`, () => fixture(async (db, accounts) => {
+    const actor = accounts[role];
+    const project = await createProject(db, actor, { title: 'Obra própria', genre: 'Conto' });
+    assert.equal(project.ownerUserId, actor.id);
+    assert.deepEqual(await getProjectForUser(db, project.id, actor), project);
+    assert.ok((await listProjects(db, actor)).some((item) => item.id === project.id));
+    const updated = await updateProject(db, actor, project.id, { title: 'Obra revisada', genre: 'Fantasia' });
+    assert.equal(updated.title, 'Obra revisada'); assert.equal(updated.genre, 'Fantasia');
+    const chapter = await createChapter(db, project.id, 'Capítulo próprio', actor);
+    assert.deepEqual(await getChapter(db, project.id, chapter.id, actor), chapter);
+    assert.deepEqual(await listChapters(db, project.id, actor), [chapter]);
+    await saveChapter(db, project.id, chapter.id, { title: 'Título revisado', content: 'Texto próprio preservado', status: 'Concluído' }, actor);
+    const saved = await getChapter(db, project.id, chapter.id, actor);
+    assert.equal(saved.title, 'Título revisado'); assert.equal(saved.content, 'Texto próprio preservado');
+    assert.equal(saved.status, 'Concluído'); assert.equal(saved.words, 3);
+    assert.equal((await getProjectForUser(db, project.id, actor)).progress, 100);
+    await deleteChapter(db, project.id, chapter.id, actor);
+    assert.deepEqual(await listChapters(db, project.id, actor), []);
+    const child = await createChapter(db, project.id, 'Excluir junto', actor);
+    await deleteProject(db, actor, project.id);
+    assert.ok(!(await listProjects(db, actor)).some((item) => item.id === project.id));
+    await assert.rejects(getProjectForUser(db, project.id, actor));
+    await assert.rejects(getChapter(db, project.id, child.id, actor));
+    assert.equal((await db.getFirstAsync('SELECT COUNT(*) AS count FROM chapters WHERE project_id = ?', project.id)).count, 0);
+  }));
+}
+
 test('RN-11/12: cria e atualiza título/gênero sem alterar proprietário ou IDs', () => fixture(async (db, { user }) => {
   const project = await createProject(db, user, { title: '  A biblioteca  ', genre: '  Fantasia  ' });
   assert.equal(project.title, 'A biblioteca'); assert.equal(project.genre, 'Fantasia'); assert.equal(project.ownerUserId, user.id);

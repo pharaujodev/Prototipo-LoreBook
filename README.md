@@ -18,13 +18,13 @@ Desenvolvido com React Native, TypeScript e Expo, o projeto explora uma experiê
 
 - Cadastro e login locais com nome, e-mail e senha.
 - Perfil **Usuário (USER)**: cria, consulta, edita e exclui suas próprias obras e capítulos.
-- Perfil **Administrador (ADMIN)**: escreve nas próprias obras e consulta usuários, suas obras e o diagnóstico SQLite em uma área administrativa separada.
+- Perfil **Administrador (ADMIN)**: escreve nas próprias obras e consulta usuários, metadados administrativos de suas obras e o diagnóstico SQLite em uma área administrativa separada.
 - Sessão restaurada automaticamente ao reabrir o aplicativo.
 - Dados da conta e saída com confirmação em **Configurações**.
 
 Cada obra tem um proprietário. A lista pessoal mostra somente as obras da conta autenticada, inclusive para Administrador. O perfil não é escolhido no formulário: a primeira conta cadastrada recebe Administrador e todas as seguintes recebem Usuário. A atribuição é informada após o cadastro.
 
-O painel administrativo mostra nome, e-mail, perfil, status e quantidade de obras das contas, sem credenciais. O detalhe permite consultar suas obras e ativar/desativar contas USER. Obras abertas por esse caminho exibem **Visualizando como administrador · somente consulta**, sem permitir alterações. Não há exclusão de contas, alteração de senha de terceiros ou edição de perfis. Contas ADMIN são preservadas: não é permitido desativar a própria conta nem o último Administrador ativo.
+O painel administrativo mostra nome, e-mail, perfil, status e quantidade de obras das contas, sem credenciais. ADMIN pode consultar metadados administrativos das obras de outros usuários, sem acesso ao conteúdo do manuscrito: título da obra, gênero, quantidade de capítulos, progresso agregado e data de atualização. O painel não abre obras nem expõe títulos ou conteúdo de capítulos individuais. O detalhe também permite ativar/desativar contas USER. Não há exclusão de contas, alteração de senha de terceiros ou edição de perfis. Contas ADMIN são preservadas: não é permitido desativar a própria conta nem o último Administrador ativo.
 
 Contas desativadas não entram no aplicativo; suas obras permanecem salvas. A desativação remove a sessão da conta. A restauração também descarta sessões de contas inativas, e os repositórios revalidam o status antes de liberar dados ou alterações.
 
@@ -101,7 +101,7 @@ No Windows, use Android ou web. As versões das dependências estão definidas e
 3. Em **Minhas obras**, toque em **Nova obra**, preencha título e gênero e crie. O primeiro Administrador também recebe as obras de exemplo.
 4. Na home da obra, crie um capítulo, edite título e texto, selecione o status e toque em **Salvar capítulo**. Essa função está disponível aos dois perfis.
 5. Em **Configurações**, consulte sua conta ou saia para entrar com outra conta.
-6. Como Administrador, use **Configurações → Painel administrativo → Ver detalhes** para consultar o usuário e suas obras ou ativar/desativar uma conta USER. O diagnóstico fica no painel.
+6. Como Administrador, use **Configurações → Painel administrativo → Ver detalhes** para consultar o usuário e os metadados de suas obras ou ativar/desativar uma conta USER. O diagnóstico fica no painel.
 
 Para editar a obra, use **Editar título e gênero** na home. A opção **Excluir obra** fica no fim dessa tela. Para excluir um capítulo, abra o editor e use **Excluir capítulo**, abaixo do manuscrito. Confirme somente após revisar a mensagem: exclusões são definitivas no dispositivo. Excluir uma obra também remove seus capítulos.
 
@@ -179,7 +179,7 @@ Telas apresentam e coletam dados; hooks/contexto coordenam estado; validações 
 - `application/actions/chapterActions.ts`: verificação de permissão antes das operações de escrita.
 - `domain/auth/`, `domain/permissions/`, `domain/validation/` e `domain/types/`: tipos, permissões, validações e regras puras, sem React ou SQLite.
 - `data/repositories/authRepository.ts`: cadastro, credenciais, sessão e revalidação da conta ativa.
-- `data/repositories/adminRepository.ts`: lista/detalhe de usuários, consulta administrativa das obras e mudança de status.
+- `data/repositories/adminRepository.ts`: lista/detalhe de usuários, consulta de metadados administrativos das obras e mudança de status.
 - `data/repositories/contentRepository.ts`: operações de obras e capítulos com proprietário obrigatório; `diagnosticsRepository.ts`: contagens administrativas.
 - `infrastructure/database/database.ts` e `transactions.ts`: schema, migrações, inicialização e transações SQLite, inclusive na Web.
 - `infrastructure/security/passwords.ts`: implementação do salt/hash com Expo Crypto.
@@ -194,8 +194,8 @@ Telas apresentam e coletam dados; hooks/contexto coordenam estado; validações 
 | RN-02 | Contas posteriores recebem USER; o cadastro não aceita escolha de perfil |
 | RN-03 | E-mail normalizado com trim/lowercase e único no SQLite |
 | RN-04 | Toda obra recebe proprietário; legado é vinculado ao primeiro ADMIN |
-| RN-05 | USER só acessa suas próprias obras |
-| RN-06 | ADMIN consulta usuários e suas obras em contexto administrativo explícito |
+| RN-05 | USER e ADMIN só acessam conteúdo das próprias obras e capítulos |
+| RN-06 | ADMIN consulta usuários e metadados administrativos das obras, sem acesso ao manuscrito alheio |
 | RN-07 | DISABLED não autentica nem mantém sessão válida |
 | RN-08 | ADMIN não desativa a própria conta |
 | RN-09 | Pelo menos um ADMIN ativo deve ser preservado; alteração de status limitada a USER |
@@ -208,7 +208,7 @@ Telas apresentam e coletam dados; hooks/contexto coordenam estado; validações 
 | RN-16 | Título de capítulo não pode ser vazio |
 | RN-17 | Obra inexistente não recebe novos capítulos |
 
-A lista pessoal filtra por proprietário. Os repositórios validam conta ativa, propriedade e contexto antes de ler ou alterar conteúdo. A consulta administrativa exige ADMIN e não libera escrita em obras alheias. Os handlers e a interface também verificam as permissões. As transações mantêm cadastro/atribuição de legado e status/invalidação de sessão consistentes.
+A lista pessoal filtra por proprietário. Os repositórios validam conta ativa e propriedade antes de ler ou alterar conteúdo, sem bypass administrativo. A consulta administrativa exige ADMIN e retorna apenas metadados explícitos e agregados, sem liberar leitura ou escrita no manuscrito alheio. Os handlers e a interface também verificam as permissões. As transações mantêm cadastro/atribuição de legado e status/invalidação de sessão consistentes.
 
 ### Evolução prevista
 

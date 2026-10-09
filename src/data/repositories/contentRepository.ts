@@ -4,7 +4,7 @@ import { ChapterDraft, countWords } from '../../domain/validation/chapterDraft';
 import * as Crypto from 'expo-crypto';
 import type { AuthUser } from '../../domain/auth/authTypes';
 import { requireActiveUser } from './authRepository';
-import { canAccessProject, canEditProject, PermissionError, requireAdminPermission } from '../../domain/permissions/permissions';
+import { canAccessProject, PermissionError } from '../../domain/permissions/permissions';
 import { inTransaction } from '../../infrastructure/database/transactions';
 import { ContentValidationError, normalizeProject, normalizeTitle, ProjectInput } from '../../domain/validation/contentValidation';
 
@@ -54,11 +54,10 @@ export async function listProjects(db: SQLiteDatabase, actor: AuthUser | null): 
 }
 export const listProjectsForUser = listProjects;
 
-export async function getProjectForUser(db: SQLiteDatabase, projectId: string, actor: AuthUser | null, administrative = false): Promise<Project> {
+export async function getProjectForUser(db: SQLiteDatabase, projectId: string, actor: AuthUser | null): Promise<Project> {
   const user = await requireActiveUser(db, actor);
-  if (administrative) requireAdminPermission(user);
-  const row = await db.getFirstAsync<ProjectRow>(`${projectQuery} WHERE p.id = ? GROUP BY p.id`, projectId);
-  if (!row || !(administrative ? canAccessProject(user, row.owner_user_id) : canEditProject(user, row.owner_user_id))) {
+  const row = await db.getFirstAsync<ProjectRow>(`${projectQuery} WHERE p.id = ? AND p.owner_user_id = ? GROUP BY p.id`, projectId, user.id);
+  if (!row || !canAccessProject(user, row.owner_user_id)) {
     throw new PermissionError('Você não possui acesso a esta obra.');
   }
   return toProject(row);
@@ -95,8 +94,8 @@ export async function deleteProject(db: SQLiteDatabase, actor: AuthUser | null, 
   });
 }
 
-export async function listChapters(db: SQLiteDatabase, projectId: string, actor: AuthUser | null, administrative = false): Promise<Chapter[]> {
-  await getProjectForUser(db, projectId, actor, administrative);
+export async function listChapters(db: SQLiteDatabase, projectId: string, actor: AuthUser | null): Promise<Chapter[]> {
+  await getProjectForUser(db, projectId, actor);
   const rows = await db.getAllAsync<ChapterRow>(
     `SELECT id, number, title, status, words, content
      FROM chapters

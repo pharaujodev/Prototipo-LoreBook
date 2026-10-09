@@ -16,14 +16,14 @@ export function canAccessAdminPanel(user: User): boolean { return user?.status =
 export const canAccessDatabaseDiagnostics = canAccessAdminPanel;
 export const canViewUsers = canAccessAdminPanel;
 export const canManageUsers = canAccessAdminPanel;
-export const canViewAllProjects = canAccessAdminPanel;
+export const canViewProjectMetadata = canAccessAdminPanel;
 
-// RN-05/06: o bypass administrativo só é utilizado por consultas explícitas.
+// RN-05/06: conteúdo é exclusivo do proprietário, inclusive para ADMIN.
 export function canAccessProject(user: AuthUser | null, ownerUserId: string | null): boolean {
-  return canWriteContent(user) && (canAccessAdminPanel(user) || user?.id === ownerUserId);
+  return canWriteContent(user) && user?.id === ownerUserId;
 }
 export function canEditProject(user: AuthUser | null, ownerUserId: string | null): boolean {
-  return canWriteContent(user) && user?.id === ownerUserId;
+  return canAccessProject(user, ownerUserId);
 }
 export function canChangeUserStatus(actor: AuthUser | null, target: AuthUser): boolean {
   return canManageUsers(actor) && actor?.id !== target.id && target.role === USER_ROLES.USER;

@@ -1,6 +1,14 @@
 import type { AuthUser } from '../auth/authTypes';
-import type { Project } from './content';
 
 export type AdminUser = AuthUser & { projectCount: number };
-export type AdminUserDetail = { user: AdminUser; projects: Project[] };
+// Contrato administrativo independente do manuscrito e de seus capítulos.
+export type AdminProjectMetadata = {
+  id: string;
+  title: string;
+  genre: string;
+  chapters: number;
+  progress: number;
+  updatedAt: string;
+};
+export type AdminUserDetail = { user: AdminUser; projects: AdminProjectMetadata[] };
 export type DatabaseDiagnostics = { projects: number; chapters: number; users: number; unownedProjects: number };

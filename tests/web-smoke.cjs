@@ -111,14 +111,19 @@ async function back(page, count = 1) { for (let i = 0; i < count; i++) await pag
     await page.getByRole('button', { name: 'Verificar banco', exact: true }).click();
     await visible(page.getByText('Obras sem proprietário: 0', { exact: true }));
     await page.getByRole('button', { name: 'Ver detalhes de User N1', exact: true }).click();
-    await page.getByRole('button', { name: 'Consultar Acervo USER', exact: true }).click();
-    await visible(page.getByText('Visualizando como administrador · somente consulta', { exact: true }));
+    await visible(page.getByText('Acervo USER', { exact: true }));
+    await visible(page.getByText('Quantidade de obras: 1', { exact: true }));
+    await visible(page.getByText('1 capítulos · Conto', { exact: true }));
+    await visible(page.getByText('Progresso: 0% dos capítulos concluídos', { exact: true }));
+    await visible(page.getByText(/^Atualização: /));
+    await visible(page.getByText('Metadados administrativos, sem acesso ao conteúdo do manuscrito.', { exact: true }));
+    assert.equal(await page.getByRole('button', { name: /Consultar Acervo USER|Abrir obra Acervo USER|Abrir capítulo/ }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Editar título e gênero', exact: true }).count(), 0);
-    await page.getByRole('tab', { name: 'Capítulos', exact: true }).click();
-    await page.getByRole('button', { name: /Abrir capítulo 1, Capítulo USER/ }).click();
-    assert.equal(await page.getByLabel('Conteúdo do capítulo', { exact: true }).isEditable(), false);
+    assert.equal(await page.getByRole('tab', { name: 'Capítulos', exact: true }).count(), 0);
+    assert.equal(await page.getByText('Capítulo USER', { exact: true }).count(), 0);
+    assert.equal(await page.getByText('Texto exclusivo do USER.', { exact: true }).count(), 0);
+    assert.equal(await page.getByLabel('Conteúdo do capítulo', { exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Salvar capítulo', exact: true }).count(), 0);
-    await back(page, 3);
     await page.getByRole('button', { name: 'Desativar conta', exact: true }).click();
     await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
     await page.getByRole('button', { name: 'Desativar conta', exact: true }).click();
@@ -149,7 +154,7 @@ async function back(page, count = 1) { for (let i = 0; i < count; i++) await pag
     await page.screenshot({ path: path.join(artifacts, '05-library-320.png'), fullPage: true });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Overflow horizontal em 320 px');
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ result: 'PASS', artifacts, checks: 'CRUD, persistência após fechar navegador, sessão, perfis, isolamento, admin read-only, desativação, confirmações, 320px' }));
+    console.log(JSON.stringify({ result: 'PASS', artifacts, checks: 'CRUD, persistência após fechar navegador, sessão, perfis, isolamento, admin apenas metadados, desativação, confirmações, 320px' }));
   } catch (error) {
     if (context) { const page = context.pages()[0]; if (page) { await page.screenshot({ path: path.join(artifacts, 'failure.png'), fullPage: true }); console.error((await page.locator('body').innerText()).slice(0, 5000)); } }
     console.error('Artefatos: ' + artifacts); console.error(error); process.exitCode = 1;

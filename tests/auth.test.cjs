@@ -82,14 +82,20 @@ test('permissões são puras; ambos escrevem e apenas ADMIN ativo administra', (
     assert.equal(rule(admin), true); assert.equal(rule(user), true); assert.equal(rule(null), false);
     assert.equal(rule({ ...user, status: 'DISABLED' }), false); assert.equal(rule({ ...user, role: 'INVALID' }), false);
   }
-  for (const rule of [permissions.canAccessAdminPanel, permissions.canViewUsers, permissions.canAccessDatabaseDiagnostics]) {
+  for (const rule of [permissions.canAccessAdminPanel, permissions.canViewUsers, permissions.canViewProjectMetadata, permissions.canAccessDatabaseDiagnostics]) {
     assert.equal(rule(admin), true); assert.equal(rule(user), false); assert.equal(rule(null), false);
     assert.equal(rule({ ...admin, status: 'DISABLED' }), false);
   }
-  assert.equal(permissions.canAccessProject(admin, user.id), true);
-  assert.equal(permissions.canAccessProject(user, user.id), true);
-  assert.equal(permissions.canAccessProject(user, admin.id), false);
-  assert.equal(permissions.canEditProject(admin, user.id), false);
+  for (const rule of [permissions.canAccessProject, permissions.canEditProject]) {
+    for (const actor of [admin, user]) {
+      assert.equal(rule(actor, actor.id), true);
+      assert.equal(rule(actor, actor === admin ? user.id : admin.id), false);
+      assert.equal(rule(actor, null), false);
+      assert.equal(rule({ ...actor, status: 'DISABLED' }, actor.id), false);
+    }
+    assert.equal(rule(null, user.id), false);
+    assert.equal(rule({ ...user, role: 'INVALID' }, user.id), false);
+  }
   assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../src/domain/permissions/permissions.ts'), 'utf8'), /from ['"](?:react|expo-sqlite)/);
 });
 

@@ -2,11 +2,9 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { AuthUser, USER_ROLES, USER_STATUSES, UserStatus } from '../../domain/auth/authTypes';
 import { requireActiveUser } from './authRepository';
 import { assertStatusChange, PermissionError, requireAdminPermission } from '../../domain/permissions/permissions';
-import { getProjectForUser, listChapters } from './contentRepository';
 import { inTransaction } from '../../infrastructure/database/transactions';
-import type { Project } from '../../domain/types/content';
 
-import type { AdminUser, AdminUserDetail } from '../../domain/types/admin';
+import type { AdminProjectMetadata, AdminUser, AdminUserDetail } from '../../domain/types/admin';
 
 export async function requireActiveAdmin(db: SQLiteDatabase, actor: AuthUser | null): Promise<AuthUser> {
   requireAdminPermission(actor);
@@ -28,19 +26,17 @@ export async function getUserDetail(db: SQLiteDatabase, actor: AuthUser | null, 
   await requireActiveAdmin(db, actor);
   const user = await db.getFirstAsync<AdminUser>(`${userQuery} WHERE u.id = ?`, userId);
   if (!user) throw new PermissionError('Usuário indisponível.');
-  const rows = await db.getAllAsync<{ id: string }>('SELECT id FROM projects WHERE owner_user_id = ? ORDER BY rowid', userId);
-  const projects = await Promise.all(rows.map((row) => getProjectForUser(db, row.id, actor, true)));
+  // RN-06: apenas metadados e agregados; não seleciona título/texto de capítulos.
+  const projects = await db.getAllAsync<AdminProjectMetadata>(`
+    SELECT p.id, p.title, p.genre, COUNT(c.id) AS chapters,
+      CASE WHEN COUNT(c.id) = 0 THEN 0 ELSE
+        ROUND(100.0 * SUM(CASE WHEN c.status = 'Concluído' THEN 1 ELSE 0 END) / COUNT(c.id)) END AS progress,
+      p.updated_at AS updatedAt
+    FROM projects p
+    LEFT JOIN chapters c ON c.project_id = p.id
+    WHERE p.owner_user_id = ?
+    GROUP BY p.id ORDER BY p.rowid`, userId);
   return { user, projects };
-}
-
-export async function getProjectAsAdmin(db: SQLiteDatabase, actor: AuthUser | null, projectId: string): Promise<Project> {
-  await requireActiveAdmin(db, actor);
-  return getProjectForUser(db, projectId, actor, true);
-}
-
-export async function listChaptersAsAdmin(db: SQLiteDatabase, actor: AuthUser | null, projectId: string) {
-  await requireActiveAdmin(db, actor);
-  return listChapters(db, projectId, actor, true);
 }
 
 export async function updateUserStatus(db: SQLiteDatabase, actor: AuthUser | null, userId: string, status: UserStatus): Promise<void> {

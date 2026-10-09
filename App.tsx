@@ -39,9 +39,9 @@ const workScreens = new Set<ScreenName>(['workHome', 'editProject', 'chapters', 
 
 function PrototypeApp({ db }: { db: SQLiteDatabase }) {
   const { requireAdmin, permissionMessage } = useAuthorization();
-  const { project: openedProject, administrative, opening, accessError, open: openProject, requireProjectWrite: requireWrite, clear: clearProject } = useProjectAccess(db);
+  const { project: openedProject, opening, accessError, open: openProject, requireProjectWrite: requireWrite, clear: clearProject } = useProjectAccess(db);
   const library = useProjects(db);
-  const manuscript = useChapters(db, openedProject?.id, administrative, requireWrite);
+  const manuscript = useChapters(db, openedProject?.id, requireWrite);
   const { confirm } = useFeedback();
   const [formDirty, setFormDirty] = useState(false);
   const [adminUserId, setAdminUserId] = useState('');
@@ -67,13 +67,13 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
     [selectedCharacterId, selectedWorkspace]
   );
 
-  const openWork = async (projectId: string, asAdmin = false) => {
-    const project = await openProject(projectId, asAdmin);
+  const openWork = async (projectId: string) => {
+    const project = await openProject(projectId);
     if (!project) return;
     const workspace = workspaces.find((item) => item.project.id === projectId);
     setSelectedCharacterId(workspace?.characters[0]?.id ?? '');
     setScreen('workHome');
-    await manuscript.load(projectId, asAdmin);
+    await manuscript.load(projectId);
   };
 
   const navigate = (next: ScreenName) => {
@@ -110,7 +110,7 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
     else if (screen === 'editProject') navigate('workHome');
     else if (screen === 'editor' || screen === 'newChapter') navigate('chapters');
     else if (screen === 'characterDetail') navigate('characters');
-    else if (screen === 'workHome') navigate(administrative ? 'adminUserDetail' : 'projects');
+    else if (screen === 'workHome') navigate('projects');
     else if (screen === 'settings') navigate(settingsOrigin);
     else if (screen === 'admin') navigate('settings');
     else if (screen === 'adminUserDetail') navigate('admin');
@@ -165,7 +165,6 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
       <View style={styles.app}>
         {opening ? <Text accessibilityLiveRegion="polite" style={styles.permission}>Abrindo obra...</Text> : null}
         {accessError ? <Text accessibilityRole="alert" style={styles.permission}>{accessError}</Text> : null}
-        {administrative && workScreens.has(screen) ? <Text style={styles.context}>Visualizando como administrador · somente consulta</Text> : null}
         {permissionMessage ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.permission}>{permissionMessage}</Text> : null}
         {screen === 'projects' ? (
           <ProjectsScreen projects={library.projects} loading={library.loading} errorMessage={library.error} onRetry={library.refresh} onCreateProject={() => { library.clearFormError(); setFormDirty(false); navigate('newProject'); }} onOpenProject={(id) => { void openWork(id); }} onSettings={() => { setSettingsOrigin('projects'); navigate('settings'); }} />
@@ -178,7 +177,7 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
                 title="Minha obra"
                 subtitle={selectedProject?.title}
                 canGoBack
-                onBack={() => navigate(administrative ? 'adminUserDetail' : 'projects')}
+                onBack={() => navigate('projects')}
                 rightLabel="⚙"
                 onRightPress={() => { setSettingsOrigin('workHome'); navigate('settings'); }}
               />
@@ -203,10 +202,9 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
                   const result = await library.save(input, screen === 'editProject' ? selectedProject?.id : undefined);
                   if (result) { setFormDirty(false); setScreen('projects'); await openWork(result.id); }
                 }} /> : null}
-              {screen === 'workHome' && selectedProject ? <WorkHomeScreen readOnly={administrative} project={selectedProject} chapters={manuscript.chapters} loading={manuscript.loading} errorMessage={manuscript.error} onRetry={() => manuscript.load(selectedProject.id)} navigate={navigate} onEdit={() => { library.clearFormError(); setFormDirty(false); navigate('editProject'); }} onDelete={removeProject} /> : null}
+              {screen === 'workHome' && selectedProject ? <WorkHomeScreen project={selectedProject} chapters={manuscript.chapters} loading={manuscript.loading} errorMessage={manuscript.error} onRetry={() => manuscript.load(selectedProject.id)} navigate={navigate} onEdit={() => { library.clearFormError(); setFormDirty(false); navigate('editProject'); }} onDelete={removeProject} /> : null}
               {screen === 'chapters' && selectedProject ? (
                 <ChaptersScreen
-                  readOnly={administrative}
                   chapters={manuscript.chapters}
                   loading={manuscript.loading}
                   errorMessage={manuscript.error}
@@ -227,7 +225,6 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
               ) : null}
               {screen === 'editor' && manuscript.selected && manuscript.draft ? (
                 <EditorScreen
-                  readOnly={administrative}
                   chapter={manuscript.selected}
                   content={manuscript.draft.content}
                   status={manuscript.draft.status}
@@ -255,14 +252,13 @@ function PrototypeApp({ db }: { db: SQLiteDatabase }) {
               {screen === 'bible' ? <BibleScreen entries={selectedWorkspace?.bibleEntries ?? []} /> : null}
               {screen === 'notes' && selectedProject ? (
                 <NotesScreen
-                  readOnly={administrative}
                   notes={notesByProject[selectedProject.id] ?? ''}
                   onChangeNotes={(value) => { if (requireWrite()) setNotesByProject((current) => ({ ...current, [selectedProject.id]: value })); }}
                 />
               ) : null}
               {screen === 'settings' ? <SettingsScreen onOpenAdmin={() => navigate('admin')} /> : null}
               {screen === 'admin' ? <AdminScreen db={db} onBack={() => navigate('settings')} onOpenUser={(id) => { if (!requireAdmin()) return; setAdminUserId(id); navigate('adminUserDetail'); }} /> : null}
-              {screen === 'adminUserDetail' ? <AdminUserDetailScreen db={db} userId={adminUserId} onBack={() => navigate('admin')} onOpenProject={(id) => { if (requireAdmin()) void openWork(id, true); }} /> : null}
+              {screen === 'adminUserDetail' ? <AdminUserDetailScreen db={db} userId={adminUserId} onBack={() => navigate('admin')} /> : null}
             </View>
 
             {activeTab && screen !== 'settings' && screen !== 'editor' && screen !== 'newChapter' && screen !== 'editProject' ? <BottomNav active={activeTab} onChange={handleTab} /> : null}
@@ -289,6 +285,5 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
   app: { flex: 1, backgroundColor: theme.colors.background },
   content: { flex: 1 },
-  context: { padding: 12, color: theme.colors.primary, backgroundColor: theme.colors.primarySoft, fontSize: 13 },
   permission: { padding: 12, color: theme.colors.danger, backgroundColor: theme.colors.dangerSoft, fontSize: 13 }
 });

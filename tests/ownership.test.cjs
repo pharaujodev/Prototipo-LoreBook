@@ -6,8 +6,8 @@ const path = require('node:path');
 const { database } = require('./helpers.cjs');
 const { initializeDatabase } = require('../src/infrastructure/database/database.ts');
 const { registerUser, authenticateUser, saveSession, restoreSession, clearSession } = require('../src/data/repositories/authRepository.ts');
-const { listProjects, getProjectForUser, createProject, listChapters, createChapter, saveChapter } = require('../src/data/repositories/contentRepository.ts');
-const { getUserDetail, getProjectAsAdmin, listChaptersAsAdmin, updateUserStatus } = require('../src/data/repositories/adminRepository.ts');
+const { listProjects, getProjectForUser, getChapter, createProject, listChapters, createChapter, saveChapter } = require('../src/data/repositories/contentRepository.ts');
+const { listUsers, getUserDetail, updateUserStatus } = require('../src/data/repositories/adminRepository.ts');
 const { assertStatusChange } = require('../src/domain/permissions/permissions.ts');
 const { createChapterForUser, saveChapterForUser } = require('../src/application/actions/chapterActions.ts');
 const valid = { name: 'Pessoa', email: 'admin@example.test', password: 'Senha123', confirmPassword: 'Senha123' };
@@ -39,21 +39,58 @@ test('RN-04/05: novas obras usam conta autenticada; listas pessoais isolam todos
   await assert.rejects(db.runAsync('UPDATE projects SET owner_user_id = ? WHERE id = ?', 'ausente', project.id), /FOREIGN KEY/);
 }));
 
-test('RN-06: bypass só administrativo, detalhe contém somente dados seguros e obras do usuário', () => withAccounts(async (db, { admin, user, other }) => {
-  const project = await createProject(db, user, { title: 'Obra USER' });
-  const chapter = await createChapter(db, project.id, 'Capítulo', user);
-  const detail = await getUserDetail(db, admin, user.id);
-  assert.equal(detail.user.projectCount, 1); assert.equal(detail.user.status, 'ACTIVE');
-  assert.equal(detail.user.password_hash, undefined); assert.equal(detail.user.password_salt, undefined);
-  assert.deepEqual(detail.projects, [await getProjectAsAdmin(db, admin, project.id)]);
-  assert.deepEqual(await listChaptersAsAdmin(db, admin, project.id), [chapter]);
-  assert.deepEqual((await getUserDetail(db, admin, other.id)).projects, []);
-  for (const actor of [user, other, null]) {
-    await assert.rejects(getUserDetail(db, actor, user.id));
-    await assert.rejects(getProjectAsAdmin(db, actor, project.id));
-    await assert.rejects(listChaptersAsAdmin(db, actor, project.id));
-    await assert.rejects(getProjectForUser(db, project.id, actor, true));
+test('RN-06: ADMIN lista usuários e somente metadados e agregados das obras', () => withAccounts(async (db, { admin, user, other }) => {
+  const project = await createProject(db, user, { title: 'Obra USER', genre: 'Fantasia' });
+  const empty = await createProject(db, user, { title: 'Obra sem capítulos' });
+  for (const status of ['Concluído', 'Concluído', 'Revisão']) {
+    const chapter = await createChapter(db, project.id, 'Título confidencial', user);
+    await saveChapter(db, project.id, chapter.id, { content: 'Manuscrito confidencial', status }, user);
   }
+  const users = await listUsers(db, admin);
+  assert.deepEqual(users.map((row) => ({ ...row })), [
+    { ...admin, projectCount: 2 }, { ...user, projectCount: 2 }, { ...other, projectCount: 0 }
+  ]);
+  const detail = await getUserDetail(db, admin, user.id);
+  assert.deepEqual({ ...detail.user }, { ...user, projectCount: 2 });
+  const updated = await getProjectForUser(db, project.id, user);
+  assert.deepEqual(detail.projects.map((row) => ({ ...row })), [
+    { id: project.id, title: project.title, genre: 'Fantasia', chapters: 3, progress: 67, updatedAt: updated.updatedAt },
+    { id: empty.id, title: empty.title, genre: '', chapters: 0, progress: 0, updatedAt: empty.updatedAt }
+  ]);
+  assert.doesNotMatch(JSON.stringify(detail), /confidencial|password|content/);
+  assert.deepEqual((await getUserDetail(db, admin, other.id)).projects, []);
+  await assert.rejects(getUserDetail(db, admin, 'ausente'), /indisponível/);
+  for (const actor of [user, other, null]) {
+    await assert.rejects(listUsers(db, actor));
+    await assert.rejects(getUserDetail(db, actor, user.id));
+  }
+}));
+
+test('RN-05/06/10: chamadas diretas e flag administrativa antiga não liberam manuscrito alheio', () => withAccounts(async (db, { admin, user, other }) => {
+  const project = await createProject(db, user, { title: 'Obra privada' });
+  const chapter = await createChapter(db, project.id, 'Título privado', user);
+  for (const actor of [admin, other, { ...other, role: 'ADMIN' }, null]) {
+    await assert.rejects(getProjectForUser(db, project.id, actor), /acesso|Entre/);
+    await assert.rejects(getChapter(db, project.id, chapter.id, actor), /acesso|Entre/);
+    await assert.rejects(listChapters(db, project.id, actor), /acesso|Entre/);
+    // JavaScript ainda pode enviar argumentos extras a APIs sem esse parâmetro.
+    await assert.rejects(getProjectForUser(db, project.id, actor, true), /acesso|Entre/);
+    await assert.rejects(listChapters(db, project.id, actor, true), /acesso|Entre/);
+  }
+  const adminRepository = require('../src/data/repositories/adminRepository.ts');
+  assert.equal(adminRepository.getProjectAsAdmin, undefined);
+  assert.equal(adminRepository.listChaptersAsAdmin, undefined);
+  assert.deepEqual(await getChapter(db, project.id, chapter.id, user), chapter);
+}));
+
+test('RN-06: metadados revalidam ADMIN ativo no banco e rejeitam perfil forjado ou antigo', () => withAccounts(async (db, { admin, user }) => {
+  await assert.rejects(getUserDetail(db, { ...user, role: 'ADMIN' }, user.id), /não possui acesso/);
+  await db.runAsync('UPDATE users SET role = ? WHERE id = ?', 'USER', admin.id);
+  await assert.rejects(listUsers(db, admin), /não possui acesso/);
+  await assert.rejects(getUserDetail(db, admin, user.id), /não possui acesso/);
+  await db.runAsync('UPDATE users SET role = ?, status = ? WHERE id = ?', 'ADMIN', 'DISABLED', admin.id);
+  await assert.rejects(listUsers(db, admin), /desativada/);
+  await assert.rejects(getUserDetail(db, admin, user.id), /desativada/);
 }));
 
 test('RN-10: criação, leitura e salvamento validam ownership mesmo em chamadas diretas', () => withAccounts(async (db, { admin, user, other }) => {

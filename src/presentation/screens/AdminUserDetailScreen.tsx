@@ -11,8 +11,8 @@ import { AuthButton } from '../components/AuthForm';
 import { useFeedback } from '../../application/contexts/FeedbackContext';
 import { theme } from '../../theme';
 
-type Props = { db: SQLiteDatabase; userId: string; onOpenProject: (id: string) => void; onBack: () => void };
-export function AdminUserDetailScreen({ db, userId, onOpenProject, onBack }: Props) {
+type Props = { db: SQLiteDatabase; userId: string; onBack: () => void };
+export function AdminUserDetailScreen({ db, userId, onBack }: Props) {
   const { user } = useAuth();
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,16 +56,16 @@ export function AdminUserDetailScreen({ db, userId, onOpenProject, onBack }: Pro
         <Text style={styles.text}>E-mail: {detail.user.email}</Text>
         <Text style={styles.text}>Perfil: {roleLabels[detail.user.role]}</Text>
         <Text style={styles.text}>Status: {statusLabels[detail.user.status]}</Text>
+        <Text style={styles.text}>Quantidade de obras: {detail.user.projectCount}</Text>
         {canChange ? <AuthButton label={saving ? 'Salvando...' : nextStatus === USER_STATUSES.ACTIVE ? 'Ativar conta' : 'Desativar conta'} disabled={saving} busy={saving} onPress={() => { if (nextStatus === USER_STATUSES.DISABLED) confirm({ title: 'Desativar esta conta?', message: detail.user.name + ' não poderá entrar. As obras e capítulos serão preservados.', confirmLabel: 'Desativar conta', danger: true, errorMessage: 'Não foi possível desativar. Tente novamente.', onConfirm: async () => { await updateUserStatus(db, user, userId, nextStatus); notify('Conta desativada.'); await load(); } }); else void changeStatus(nextStatus); }} /> : <Text style={styles.text}>Contas administrativas são preservadas neste protótipo.</Text>}
       </View>
       <Text accessibilityRole="header" style={styles.title}>Obras do usuário</Text>
+      <Text style={styles.text}>Metadados administrativos, sem acesso ao conteúdo do manuscrito.</Text>
       {detail.projects.length === 0 ? <FeedbackState kind="empty" title="Nenhuma obra" message="Este usuário ainda não possui obras." /> : detail.projects.map((project) => <View key={project.id} style={styles.card}>
         <Text style={styles.title}>{project.title}</Text>
         <Text style={styles.text}>{project.chapters} capítulos · {project.genre}</Text>
-        <AuthButton label={`Consultar ${project.title}`} secondary disabled={saving} onPress={() => {
-          if (!canViewUsers(user)) { setError(ADMIN_ONLY_MESSAGE); return; }
-          onOpenProject(project.id);
-        }} />
+        <Text style={styles.text}>Progresso: {project.progress}% dos capítulos concluídos</Text>
+        {project.updatedAt ? <Text style={styles.text}>Atualização: {new Date(project.updatedAt).toLocaleString('pt-BR')}</Text> : null}
       </View>)}
     </> : null}
   </ScrollView>;

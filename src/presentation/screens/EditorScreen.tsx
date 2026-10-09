@@ -31,7 +31,7 @@ export function EditorScreen({ readOnly = false, chapter, title, content, status
       {editable ? <AppButton label="Excluir capítulo" secondary disabled={busy} onPress={onDelete} /> : null}
     </ScrollView>
     <View style={styles.footer}>
-      <Text accessibilityLiveRegion="polite" accessibilityRole={saveState === 'error' ? 'alert' : undefined} style={[styles.saveState, saveState === 'error' && styles.error]}>{editable ? stateLabel : 'Modo administrativo · somente leitura'}</Text>
+      <Text accessibilityLiveRegion="polite" accessibilityRole={saveState === 'error' ? 'alert' : undefined} style={[styles.saveState, saveState === 'error' && styles.error]}>{editable ? stateLabel : 'Edição indisponível'}</Text>
       {editable ? <AppButton label={busy ? 'Salvando...' : 'Salvar capítulo'} busy={busy} disabled={saveState === 'saved'} onPress={onSave} /> : null}
     </View>
   </KeyboardAvoidingView>;
